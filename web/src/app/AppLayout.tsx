@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { errorMessage } from '@/api/client';
 import { useAuth } from '@/features/auth/AuthProvider';
-import type { LoginLocationState } from '@/features/auth/LoginPage';
 import { cx } from '@/lib/cx';
 import { enumLabel } from '@/lib/enums';
 import { Icon, Menu, useToast } from '@/ui';
@@ -22,7 +21,6 @@ export function AppLayout() {
   const { t } = useTranslation('nav');
   const { user, org, hasRole, logout } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const toast = useToast();
   const [navOpen, setNavOpen] = useState(false);
 
@@ -37,15 +35,8 @@ export function AppLayout() {
 
   if (!user) return null;
 
-  const doLogout = async () => {
-    try {
-      await logout();
-    } catch (err) {
-      toast.error(errorMessage(err));
-    }
-    const state: LoginLocationState = { notice: 'loggedOut' };
-    navigate('/login', { replace: true, state });
-  };
+  // The session query is cleared either way; the route guard then redirects to /login.
+  const doLogout = () => logout().catch((err) => toast.error(errorMessage(err)));
 
   const userMenu = (variant: 'sidebar' | 'topbar') => (
     <Menu

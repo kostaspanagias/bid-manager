@@ -50,6 +50,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/invite/:token', element: <AcceptInvitePage /> },
+      { path: '/accept-invite', element: <AcceptInvitePage /> }, // ?token=… — the link format in the server's e-mail
       {
         element: (
           <RequireAuth>

@@ -131,7 +131,11 @@
       "create": "Δημιουργία",
       "update": "Αλλαγή",
       "delete": "Διαγραφή",
-      "remove": "Διαγραφή"
+      "remove": "Διαγραφή",
+      "login": "Σύνδεση",
+      "logout": "Αποσύνδεση",
+      "totp_enabled": "Ενεργοποίηση 2FA",
+      "totp_attempts_exceeded": "Υπέρβαση προσπαθειών 2FA"
     },
     "changedFields_one": "{{count}} πεδίο",
     "changedFields_other": "{{count}} πεδία",

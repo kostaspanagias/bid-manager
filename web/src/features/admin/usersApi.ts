@@ -1,13 +1,14 @@
 /**
- * Admin → users & invitations. API shape assumptions live here only.
+ * Admin → users & invitations. API shape assumptions live here only (reconciled with server/src/modules/admin).
  *
- *   GET    /api/admin/users            → { items: AdminUser[] }
- *   PATCH  /api/admin/users/:id        { org_role?, active? } → the updated user (body ignored by the UI)
- *                                      "deactivate" = PATCH { active: false }
- *   GET    /api/admin/invitations      → { items: Invitation[] }  (id, email, org_role, expires_at, accepted_at, created_at)
- *   POST   /api/admin/invitations      { email, org_role } → { invitation, inviteUrl } — the token exists in clear
- *                                      only in this response; also accepted: { token } / { invite_url } / { url }
- *   DELETE /api/admin/invitations/:id  → 204
+ *   GET    /api/admin/users                 → { items: [{ id, email, name, org_role, active, totp_enabled, last_login_at, created_at }] }
+ *   PATCH  /api/admin/users/:id             { org_role?, active?, name? } → the user. "deactivate" = { active: false }
+ *                                           422 self_change / last_admin
+ *   POST   /api/admin/users/:id/reset-totp  → the user (2FA cleared, sessions ended)
+ *   GET    /api/admin/invitations           → { items: [{ id, email, org_role, status, expires_at, accepted_at, created_at }] }
+ *   POST   /api/admin/invitations           { email, org_role } → 201 { invitation, token, acceptUrl, emailSent }
+ *                                           (token in clear only here; 409 user_exists)
+ *   DELETE /api/admin/invitations/:id       → 204 (409 invitation_accepted)
  */
 import { api, type ListResponse } from '@/api/client';
 import type { ID, Invitation, OrgRole, Timestamp } from '@/api/types';
@@ -18,7 +19,7 @@ export interface AdminUser {
   name: string;
   org_role: OrgRole;
   active: boolean;
-  totp_enabled_at: Timestamp | null;
+  totp_enabled: boolean;
   last_login_at: Timestamp | null;
   created_at?: Timestamp;
 }
@@ -28,8 +29,17 @@ export const adminUsersKeys = {
   invitations: ['admin', 'invitations'] as const,
 };
 
-export function listAdminUsers(): Promise<AdminUser[]> {
-  return api.get<ListResponse<AdminUser>>('/admin/users').then((r) => r.items);
+type RawAdminUser = Omit<AdminUser, 'totp_enabled'> & { totp_enabled?: boolean; totp_enabled_at?: Timestamp | null };
+
+export async function listAdminUsers(): Promise<AdminUser[]> {
+  const res = await api.get<ListResponse<RawAdminUser>>('/admin/users');
+  // Accept either the boolean or the raw timestamp column.
+  return res.items.map((u) => ({ ...u, totp_enabled: u.totp_enabled ?? Boolean(u.totp_enabled_at) }));
+}
+
+/** Lost authenticator: the user enrols TOTP again at the next login. */
+export function resetUserTotp(id: ID): Promise<unknown> {
+  return api.post(`/admin/users/${id}/reset-totp`);
 }
 
 export function updateAdminUser(id: ID, patch: { org_role?: OrgRole; active?: boolean }): Promise<unknown> {
@@ -42,20 +52,23 @@ export function listInvitations(): Promise<Invitation[]> {
 
 export interface CreatedInvitation {
   email: string;
-  /** Full link to send to the invitee; null if the server did not return a token/URL */
+  /** Full link to give to the invitee; null if the server did not return a token/URL */
   inviteUrl: string | null;
+  /** Whether the server e-mailed the link (null = it did not say) */
+  emailSent: boolean | null;
 }
 
 export async function createInvitation(input: { email: string; org_role: OrgRole }): Promise<CreatedInvitation> {
   const raw = await api.post<Record<string, unknown>>('/admin/invitations', input);
   const nested = (raw.invitation ?? {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
-  const url = str(raw.inviteUrl) ?? str(raw.invite_url) ?? str(raw.url) ?? str(nested.inviteUrl) ?? str(nested.invite_url);
   const token = str(raw.token) ?? str(nested.token);
+  const url = str(raw.acceptUrl) ?? str(raw.inviteUrl) ?? str(raw.invite_url) ?? str(raw.url);
+  // Prefer a link on the origin the admin is using right now (the server's APP_URL may differ in dev).
   let inviteUrl: string | null = null;
-  if (url) inviteUrl = new URL(url, window.location.origin).toString();
-  else if (token) inviteUrl = `${window.location.origin}/invite/${encodeURIComponent(token)}`;
-  return { email: input.email, inviteUrl };
+  if (token) inviteUrl = `${window.location.origin}/invite/${encodeURIComponent(token)}`;
+  else if (url) inviteUrl = new URL(url, window.location.origin).toString();
+  return { email: input.email, inviteUrl, emailSent: typeof raw.emailSent === 'boolean' ? raw.emailSent : null };
 }
 
 export function deleteInvitation(id: ID): Promise<void> {

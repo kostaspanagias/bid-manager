@@ -1,18 +1,34 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { errorMessage, isApiError } from '@/api/client';
-import { Banner, Button, Field, Input } from '@/ui';
+import { enumLabel } from '@/lib/enums';
+import { Banner, Button, Field, Input, LinkButton, PageSpinner } from '@/ui';
 import { authApi, PASSWORD_MIN_LENGTH } from './authApi';
 import { AuthLayout } from './AuthLayout';
 import type { LoginLocationState } from './LoginPage';
 
-/** /invite/:token — the invited person sets name + password, then logs in and enrols TOTP. */
+/**
+ * /invite/:token (and /accept-invite?token=…, the link in the server's invitation e-mail) —
+ * the invited person sets name + password, then logs in and enrols TOTP.
+ */
 export function AcceptInvitePage() {
   const { t } = useTranslation('auth');
-  const { token = '' } = useParams();
+  const params = useParams();
+  const [search] = useSearchParams();
+  const token = params.token ?? search.get('token') ?? '';
   const navigate = useNavigate();
+
+  // Who the invitation is for; also tells an invalid/expired link before the form is filled in.
+  const info = useQuery({
+    queryKey: ['auth', 'invite-info', token],
+    queryFn: () => authApi.inviteInfo(token),
+    enabled: Boolean(token),
+    retry: false,
+    staleTime: Infinity,
+  });
+  const invalid = !token || (isApiError(info.error) && [400, 404, 410, 422].includes(info.error.status));
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -20,8 +36,8 @@ export function AcceptInvitePage() {
 
   const accept = useMutation({
     mutationFn: () => authApi.acceptInvite({ token, name: name.trim(), password }),
-    onSuccess: () => {
-      const state: LoginLocationState = { notice: 'inviteAccepted' };
+    onSuccess: ({ email }) => {
+      const state: LoginLocationState = { notice: 'inviteAccepted', email: email ?? info.data?.email };
       navigate('/login', { replace: true, state });
     },
   });
@@ -46,6 +62,18 @@ export function AcceptInvitePage() {
       ? t('invite.invalid')
       : errorMessage(accept.error);
 
+  if (invalid) {
+    return (
+      <AuthLayout title={t('invite.invalidTitle')}>
+        <div className="auth__form">
+          <Banner tone="red">{t('invite.invalid')}</Banner>
+          <LinkButton to="/login">{t('invite.toLogin')}</LinkButton>
+        </div>
+      </AuthLayout>
+    );
+  }
+  if (info.isPending) return <PageSpinner label={t('invite.checking')} />;
+
   return (
     <AuthLayout
       title={t('invite.title')}
@@ -57,6 +85,11 @@ export function AcceptInvitePage() {
       }
     >
       <form className="auth__form" onSubmit={submit} noValidate>
+        {info.data && (
+          <Banner tone="info" title={t('invite.for', { email: info.data.email })}>
+            {t('invite.forOrg', { org: info.data.org_name, role: enumLabel('org_role', info.data.org_role) })}
+          </Banner>
+        )}
         {serverError && <Banner tone="red">{serverError}</Banner>}
         <Field label={t('invite.name')} required error={touched ? errors.name : undefined}>
           <Input name="name" autoComplete="name" autoFocus value={name} onChange={(e) => setName(e.target.value)} />

@@ -25,13 +25,14 @@ mkdirSync(outDir, { recursive: true });
 /* ------------------------------------------------------------- mock data */
 const uid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const users = [
-  { id: uid(1), name: 'Κώστας Παναγιάς', email: 'kostas@example.gr', org_role: 'admin', active: true, totp_enabled_at: '2026-10-01T08:00:00Z', last_login_at: '2026-11-13T07:42:00Z' },
-  { id: uid(2), name: 'Μαρία Αντωνίου', email: 'maria@example.gr', org_role: 'bid_manager', active: true, totp_enabled_at: '2026-10-02T08:00:00Z', last_login_at: '2026-11-12T16:05:00Z' },
-  { id: uid(3), name: 'Γιώργος Δημητρίου', email: 'giorgos@example.gr', org_role: 'member', active: true, totp_enabled_at: '2026-10-05T08:00:00Z', last_login_at: '2026-11-13T06:58:00Z' },
-  { id: uid(4), name: 'Ελένη Παπαδοπούλου', email: 'eleni@example.gr', org_role: 'approver', active: true, totp_enabled_at: null, last_login_at: null },
-  { id: uid(5), name: 'Νίκος Σταθόπουλος', email: 'nikos@partner.example.gr', org_role: 'viewer', active: false, totp_enabled_at: '2026-06-01T08:00:00Z', last_login_at: '2026-07-20T10:11:00Z' },
+  { id: uid(1), name: 'Κώστας Παναγιάς', email: 'kostas@example.gr', org_role: 'admin', active: true, totp_enabled: true, last_login_at: '2026-11-13T07:42:00Z' },
+  { id: uid(2), name: 'Μαρία Αντωνίου', email: 'maria@example.gr', org_role: 'bid_manager', active: true, totp_enabled: true, last_login_at: '2026-11-12T16:05:00Z' },
+  { id: uid(3), name: 'Γιώργος Δημητρίου', email: 'giorgos@example.gr', org_role: 'member', active: true, totp_enabled: true, last_login_at: '2026-11-13T06:58:00Z' },
+  { id: uid(4), name: 'Ελένη Παπαδοπούλου', email: 'eleni@example.gr', org_role: 'approver', active: true, totp_enabled: false, last_login_at: null },
+  { id: uid(5), name: 'Νίκος Σταθόπουλος', email: 'nikos@partner.example.gr', org_role: 'viewer', active: false, totp_enabled: true, last_login_at: '2026-07-20T10:11:00Z' },
 ];
-const me = { user: users[0], org: { id: uid(100), name: 'Active Computer Systems', timezone: 'Europe/Athens' }, csrfToken: 'csrf-mock' };
+const { id, email, name, org_role } = users[0];
+const me = { stage: 'ready', user: { id, email, name, org_role }, org: { id: uid(100), name: 'Active Computer Systems', timezone: 'Europe/Athens' }, csrfToken: 'csrf-mock' };
 const tender = {
   id: uid(200),
   org_id: uid(100),
@@ -104,20 +105,26 @@ function mockApi(page, state) {
     const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     const error = (status, code, message) => json({ error: { code, message } }, status);
 
-    if (path === '/auth/me') return state.loggedIn ? json(me) : error(401, 'unauthorized', 'Απαιτείται σύνδεση');
-    if (path === '/auth/login') return json({ next: state.loginNext });
-    if (path === '/auth/totp' || path === '/auth/totp/enable') { state.loggedIn = true; return json({ ok: true }); }
+    // Shapes mirror server/src/core/authRoutes.ts
+    if (path === '/auth/me') {
+      if (state.loggedIn) return json(me);
+      if (state.pending) return json({ stage: state.loginNext, csrfToken: 'csrf-partial' });
+      return error(401, 'unauthorized', 'Authentication required');
+    }
+    if (path === '/auth/login') { state.pending = true; return json({ stage: state.loginNext, csrfToken: 'csrf-partial' }); }
+    if (path === '/auth/totp' || path === '/auth/totp/enable') { state.loggedIn = true; return json(me); }
+    if (path === '/auth/invite-info') return json({ email: 'sofia@example.gr', org_role: 'member', org_name: 'Active Computer Systems' });
     if (path === '/auth/totp/setup')
       return json({ secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', otpauthUrl: 'otpauth://totp/BidManager:x?secret=JBSWY3DPEHPK3PXP', qrDataUrl: `data:image/svg+xml,${encodeURIComponent(qrSvg)}` });
-    if (path === '/auth/logout') { state.loggedIn = false; return json({ ok: true }); }
-    if (path === '/auth/accept-invite') return json({ ok: true });
-    if (!state.loggedIn) return error(401, 'unauthorized', 'Απαιτείται σύνδεση');
+    if (path === '/auth/logout') { state.loggedIn = false; state.pending = false; return route.fulfill({ status: 204 }); }
+    if (path === '/auth/accept-invite') return json({ ok: true, email: 'sofia@example.gr' }, 201);
+    if (!state.loggedIn) return error(401, 'unauthorized', 'Authentication required');
 
     if (path === '/users') return json({ items: users.filter((u) => u.active).map(({ id, name, email, org_role }) => ({ id, name, email, org_role })) });
     if (path === '/admin/users') return json({ items: users });
     if (path.startsWith('/admin/users/') && method === 'PATCH') return json({ ok: true });
     if (path === '/admin/invitations' && method === 'GET') return json({ items: invitations });
-    if (path === '/admin/invitations' && method === 'POST') return json({ invitation: invitations[0], inviteUrl: '/invite/9f2c1d6e7a8b4c3d9e0f1a2b3c4d5e6f' });
+    if (path === '/admin/invitations' && method === 'POST') return json({ invitation: invitations[0], token: '9f2c1d6e7a8b4c3d9e0f1a2b3c4d5e6f', acceptUrl: 'http://localhost:5173/accept-invite?token=9f2c1d6e7a8b4c3d9e0f1a2b3c4d5e6f', emailSent: true }, 201);
     if (path === '/holidays') return json({ items: holidays(url.searchParams.get('year') ?? '2026') });
     if (path === '/audit') return json({ items: audit, total: 312 });
     if (path === `/tenders/${tender.id}`) return json({ tender, permissions: { canWrite: true, canSeeFinancial: true } });
@@ -143,7 +150,21 @@ const shots = [
       await page.getByRole('button', { name: 'Συνέχεια' }).click();
       await page.getByRole('img', { name: /QR/ }).waitFor();
     } },
-  { name: 'invite', loggedIn: false, path: '/invite/abc123' },
+  { name: 'invite', loggedIn: false, path: '/accept-invite?token=9f2c1d6e7a8b4c3d9e0f1a2b3c4d5e6f', fullPage: true },
+  { name: 'logout', path: '/', only: 'desktop', run: async (page) => {
+      await page.getByRole('button', { name: 'Μενού χρήστη' }).click();
+      await page.getByRole('menuitem', { name: 'Αποσύνδεση' }).click();
+      await page.getByText('Αποσυνδεθήκατε.').waitFor();
+    } },
+  { name: 'login-full-flow', loggedIn: false, path: '/tenders', only: 'desktop', run: async (page) => {
+      // guard → login → TOTP → back to the page that was asked for
+      await page.getByLabel('Email').fill('kostas@example.gr');
+      await page.getByLabel('Κωδικός').fill('correct horse battery');
+      await page.getByRole('button', { name: 'Συνέχεια' }).click();
+      await page.getByLabel(/Κωδικός 6 ψηφίων/).fill('123456');
+      await page.getByRole('heading', { name: 'Διαγωνισμοί' }).waitFor();
+      if (!page.url().endsWith('/tenders')) throw new Error(`expected /tenders, got ${page.url()}`);
+    } },
   { name: 'dashboard', path: '/' },
   { name: 'nav-open', path: '/', only: 'mobile', run: async (page) => { await page.getByRole('button', { name: 'Άνοιγμα μενού' }).click(); await page.waitForTimeout(300); } },
   { name: 'user-menu', path: '/', only: 'desktop', run: async (page) => { await page.getByRole('button', { name: 'Μενού χρήστη' }).click(); } },

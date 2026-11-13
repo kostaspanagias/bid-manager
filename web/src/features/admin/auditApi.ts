@@ -1,15 +1,16 @@
 /**
- * Admin → audit log (read-only).
+ * Admin → audit log (read-only; reconciled with server/src/modules/audit/routes.ts).
  *
- *   GET /api/audit?entity=&entity_id=&user_id=&limit=&offset= → { items: AuditLogEntry[], total }
- *   item: { id, user_id, entity, entity_id, action, before, after, at }  (newest first)
- *   Optional `user_name` on items is used when present; otherwise names come from GET /api/users.
+ *   GET /api/audit?entity=&entity_id=&user_id=&limit=&offset= → { items, total, limit, offset }  (newest first)
+ *   item: { id, at, user_id, user_name, entity, entity_id, tender_id, action, before, after }
+ *   The server also accepts tender_id= and action= (not used by the UI yet).
  */
 import { api, type PagedResponse } from '@/api/client';
 import type { AuditLogEntry, ID, Json } from '@/api/types';
 
 export interface AuditItem extends AuditLogEntry {
   user_name?: string | null;
+  tender_id?: ID | null;
 }
 
 export interface AuditFilters {

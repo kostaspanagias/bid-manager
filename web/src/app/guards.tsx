@@ -13,10 +13,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
   if (auth.status === 'loading') return <PageSpinner label={t('checking')} />;
   if (!auth.user) {
-    const state: LoginLocationState = {
-      from: location.pathname + location.search,
-      notice: auth.sessionExpired ? 'expired' : undefined,
-    };
+    // After a deliberate logout the next login starts at the dashboard, not where the previous user was.
+    const state: LoginLocationState = auth.loggedOut
+      ? { notice: 'loggedOut' }
+      : { from: location.pathname + location.search, notice: auth.sessionExpired ? 'expired' : undefined };
     return <Navigate to="/login" replace state={state} />;
   }
   return <>{children}</>;

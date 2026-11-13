@@ -92,7 +92,13 @@ add a component to `ui/` rather than restyling locally, and say so in your repor
 
 `api` (`@/api/client`): `api.get/post/put/patch/del<T>(path, body?, { query, signal })`,
 `api.upload<T>(path, FormData | { file, files, fields })`, `api.downloadUrl(path, query?)`. Paths are relative to `/api`.
-Errors are `ApiError { status, code, message, details, fieldErrors }`; a 401 anywhere sends the user to the login screen.
+Errors are `ApiError { status, code, message, details, fieldErrors, serverMessage }`; a 401 anywhere sends the user
+to the login screen.
+
+**Error texts.** The server's messages are English, the UI is Greek. `ApiError.message` (what `errorMessage(err)`
+returns) is translated by error **code**: add `"errorCodes": { "<server_code>": "Ελληνικό μήνυμα" }` to your own
+namespace JSON and it is picked up automatically (generic codes are in `common.json`). Untranslated codes show the
+server's English text, so give your endpoints specific codes and translate them.
 
 ## UI kit (`import { … } from '@/ui'`)
 
@@ -129,8 +135,9 @@ Props are documented in each component file. Status colours: **red = blocking, o
 Utilities in `styles/base.css`: `.u-stack`, `.u-row`, `.u-form-grid` (+ `.u-span-2`), `.u-grid`, `.u-mono`, `.u-muted`,
 `.u-sr-only`, `.u-truncate`. Feature CSS (rarely needed) goes in the feature folder and uses the tokens only.
 
-## Assumed API shapes
+## API shapes used by the foundation
 
-The server was built in parallel. Assumptions are isolated, one file each, with the contract in the file header:
+Each is isolated in one adapter file with the contract in its header (auth, admin users/invitations, holidays,
+audit and users were reconciled against the server code; the tender record is still an assumption):
 `features/auth/authApi.ts`, `features/tenders/tenderApi.ts`, `features/shared/useUsers.ts`,
 `features/shared/holidaysApi.ts`, `features/admin/{usersApi,holidaysApi,auditApi}.ts`.

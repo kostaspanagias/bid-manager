@@ -35,6 +35,7 @@ import {
   invitationState,
   listAdminUsers,
   listInvitations,
+  resetUserTotp,
   updateAdminUser,
   type AdminUser,
   type CreatedInvitation,
@@ -122,6 +123,7 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
   const [showInactive, setShowInactive] = useState(true);
   const [roleFor, setRoleFor] = useState<AdminUser | null>(null);
   const [deactivate, setDeactivate] = useState<AdminUser | null>(null);
+  const [resetFor, setResetFor] = useState<AdminUser | null>(null);
 
   const invalidate = () =>
     Promise.all([
@@ -135,6 +137,16 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
       await invalidate();
       toast.success(t(vars.active ? 'users.activated' : 'users.deactivated'));
       setDeactivate(null);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+
+  const resetTotp = useMutation({
+    mutationFn: (user: AdminUser) => resetUserTotp(user.id),
+    onSuccess: async () => {
+      await invalidate();
+      toast.success(t('users.totpReset'));
+      setResetFor(null);
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -168,7 +180,7 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
       key: 'totp',
       header: t('users.columns.twoFactor'),
       render: (u) =>
-        u.totp_enabled_at ? (
+        u.totp_enabled ? (
           <Badge tone="green">{t('users.twoFactorOn')}</Badge>
         ) : (
           <Badge tone="orange">{t('users.twoFactorOff')}</Badge>
@@ -204,6 +216,7 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
             disabled={u.id === me?.id}
             items={[
               { label: t('users.changeRole'), icon: 'edit', onSelect: () => setRoleFor(u) },
+              u.totp_enabled && { label: t('users.resetTotp'), icon: 'shield', onSelect: () => setResetFor(u) },
               u.active
                 ? { label: t('users.deactivate'), icon: 'block', danger: true, separatorBefore: true, onSelect: () => setDeactivate(u) }
                 : { label: t('users.activate'), icon: 'check', separatorBefore: true, onSelect: () => setActive.mutate({ user: u, active: true }) },
@@ -232,6 +245,15 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
         emptyTitle={search ? t('common:state.emptyFiltered') : t('users.empty')}
       />
       <ChangeRoleModal user={roleFor} onClose={() => setRoleFor(null)} onSaved={invalidate} />
+      <ConfirmDialog
+        open={resetFor !== null}
+        title={t('users.resetTotpTitle')}
+        message={resetFor ? t('users.resetTotpMessage', { name: resetFor.name }) : null}
+        confirmLabel={t('users.resetTotp')}
+        loading={resetTotp.isPending}
+        onCancel={() => setResetFor(null)}
+        onConfirm={() => resetFor && resetTotp.mutate(resetFor)}
+      />
       <ConfirmDialog
         open={deactivate !== null}
         danger
@@ -447,7 +469,16 @@ function InviteModal({ open, onClose, onCreated }: { open: boolean; onClose: () 
       >
         {created.inviteUrl ? (
           <div className="u-stack">
-            <Banner tone="orange">{t('invitations.createdHint', { email: created.email })}</Banner>
+            <Banner tone={created.emailSent === true ? 'green' : 'orange'}>
+              {t(
+                created.emailSent === true
+                  ? 'invitations.emailSent'
+                  : created.emailSent === false
+                    ? 'invitations.emailFailed'
+                    : 'invitations.createdHint',
+                { email: created.email },
+              )}
+            </Banner>
             <div className="admin-invite-link">
               <Field label={t('invitations.link')}>
                 <Input readOnly value={created.inviteUrl} onFocus={(e) => e.currentTarget.select()} data-autofocus />

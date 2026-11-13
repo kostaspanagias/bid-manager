@@ -252,3 +252,64 @@ retried) and every execution is logged there. Put a feature's `registerJob` call
 - Do not commit; do not start long-lived servers on fixed ports without stopping them.
 - `tsc`/build may show errors from other people's in-progress files — fix only your own.
 - New migrations, if unavoidable, use your assigned number range.
+
+## Stage 2 conventions (feature slices)
+
+Seven vertical slices are built in parallel. Each owns its server module folders and web feature folders and reads
+other slices' **tables** directly through the scoped layer — never imports another slice's code (only `core/`,
+`db/`, `domain/`). The shared data conventions below are what make the slices fit together.
+
+| Slice | Server (`src/modules/…`, plus) | Web (`src/features/…`) | Migration range |
+| --- | --- | --- | --- |
+| 1 Tenders + scheduler | `tenders`, `milestones`, `domain/scheduler.ts`, `db/seeds/templateL11.ts` | `tenders`, `schedule` | 010–019 |
+| 2 Templates + lessons + account | `templates`, `lessons`, password change in `core/authRoutes.ts` | `templates`, `lessons`, `account` | 020–029 |
+| 3 Gates | `gates` | `gates` | 030–039 |
+| 4 Requirements register | `requirements` | `requirements` | 040–049 |
+| 5 Tasks, handoffs, watchlist, risks, change log | `tasks`, `my`, `watch`, `risks`, `changes` | `tasks`, `my`, `watch`, `risks`, `changes` | 050–059 |
+| 6 Files, company documents, GDPR | `files`, `documents`, `company-documents`, `gdpr` | `files`, `documents` | 060–069 |
+| 7 Notifications + dashboard | `notifications`, `dashboard` (+ their `jobs.ts`) | `dashboard` | 070–079 |
+
+### Template item shapes (`template_item`; offsets signed)
+
+| kind | columns used | payload |
+| --- | --- | --- |
+| role | key (`A`,`B`,`C`,`MGMT`), name, sort | `{ folder?: 'participation'|'technical'|'financial', financial?: boolean, management?: boolean }` |
+| gate | key (`G0`…`G4`), name, owner_role_key = approver role, anchor/offset_value/offset_unit = the binding ("latest") date | `{ decision_mode: 'approval'|'go_no_go', target?: {anchor, offset_value, offset_unit}, warn_if_target_after?: {anchor, offset_value, offset_unit}, compressed?: {anchor, offset_value, offset_unit} }` |
+| gate_criterion | key, name = criterion text, sort | `{ gate_key, type: 'manual'|'auto', auto_rule?: string }` |
+| milestone | key (e.g. `UPLOAD`), name, anchor/offset | `{}` |
+| handoff | key, name = what is handed over, anchor/offset | `{ from_role, to_role }` |
+| task | key, name, owner_role_key, anchor/offset (optional) | `{ description?: string }` |
+| checklist_item | key, name, owner_role_key | `{}` |
+| watch_item | key, name, owner_role_key | `{ lead_value: number|null, lead_unit: 'working'|'calendar', needed_milestone_key?: string, checks?: string }` |
+
+`condition` (`always` / `demo` / `partners`) applies to every kind.
+
+### How template items become tender rows (slice 1 creates, others operate)
+
+- role → `tender_role`. Members are attached via `tender_member (user_id, tender_role_key)`.
+- gate → one `milestone` (kind `gate`, same key) + one `gate` row (key, decision_mode, approver_role_key;
+  `approver_user_id` = first member holding that role, changeable later) + its `gate_criterion` rows.
+- milestone → `milestone` (kind `milestone`).
+- handoff → one `milestone` (kind `handoff`) + one `task` (section `handoff`, same key, `milestone_id`, `due_date`
+  mirrors the milestone, `handoff_from_role`/`handoff_to_role`). Slice 5 owns delivery/receipt: receipt sets
+  `received_by`/`received_at`, task status `done` and the milestone's `done_at`.
+- task → `task` (section `task`); checklist_item → `task` (section `checklist`, `owner_role_key`; "Δ/Α" = status `na`).
+- watch_item → `watch_item` (key, lead_*, `needed_milestone_key`, `needed_at` = that milestone's due date; slice 1
+  refreshes `needed_at` whenever the schedule is recomputed). The participation guarantee has **key `guarantee`**.
+- `tender.template_snapshot` keeps the full copy of the template items used (F2).
+
+### Cross-slice rules
+
+- `GET /api/tenders/:id` → `{ tender, permissions: { canWrite, canSeeFinancial }, tMinus, warnings: [...] }`.
+- R9 extension (slice 1) inserts the `change_entry` (kind `extension`) row itself and emits `tender.extended`.
+- R14 No-Go (slice 3) sets `tender.status='no_go'`, `closed_at`, and cancels open tasks itself.
+- `handoffs_received` (slice 3): every handoff task with `due_date` ≤ the gate's date and status not in
+  (`na`,`cancelled`) has `received_at`. `guarantee_arrived`: the watch item with key `guarantee` has `arrived_at`.
+- R6 lives in `domain/watch.ts` (`lastRequestDate`, `requestOverdue`) — use it, do not re-derive.
+- A file with `folder='financial'` always gets `confidentiality='financial'` (slice 6); any listing that joins
+  `file` must respect `canSeeFinancial`.
+- Gate approval request = `POST …/gates/:gateId/request` → sets `requested_at`, emits `gate.approval_requested`;
+  slice 7 turns events into e-mail.
+- Closed tenders (`submitted`, `no_go`, `cancelled`) are read-only for everything except lessons and files.
+- Error codes are specific snake_case strings; the web translates them via `errorCodes.<code>` in the feature's own
+  i18n namespace.

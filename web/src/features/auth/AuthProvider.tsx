@@ -21,9 +21,12 @@ export interface AuthContextValue {
   pendingStep: LoginNext | null;
   /** True after the session ended on its own (401 while logged in), until the next login */
   sessionExpired: boolean;
+  /** True after the user logged out in this tab, until the next login (drives the «Αποσυνδεθήκατε» notice) */
+  loggedOut: boolean;
   /** Re-reads /api/auth/me (call after completing login) */
   refresh: () => Promise<Me | null>;
-  logout: () => Promise<void>;
+  /** Ends the session; the route guard then shows the login screen. `silent` skips the logged-out notice. */
+  logout: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -31,6 +34,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [loggedOut, setLoggedOut] = useState(false);
 
   const query = useQuery({
     queryKey: ME_KEY,
@@ -58,17 +62,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = await queryClient.fetchQuery({ queryKey: ME_KEY, queryFn: authApi.session, staleTime: 0 });
     if (session.status === 'ready') {
       setSessionExpired(false);
+      setLoggedOut(false);
       dropData();
       return session.me;
     }
     return null;
   }, [queryClient, dropData]);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (options?: { silent?: boolean }) => {
     try {
       await authApi.logout();
     } finally {
       setSessionExpired(false);
+      setLoggedOut(!options?.silent);
       queryClient.setQueryData<Session>(ME_KEY, { status: 'none' });
       dropData();
     }
@@ -88,10 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canEdit: Boolean(role && role !== 'viewer'),
       pendingStep,
       sessionExpired,
+      loggedOut,
       refresh,
       logout,
     };
-  }, [me, pendingStep, query.isPending, sessionExpired, refresh, logout]);
+  }, [me, pendingStep, query.isPending, sessionExpired, loggedOut, refresh, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

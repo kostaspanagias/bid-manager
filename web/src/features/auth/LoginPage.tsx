@@ -39,7 +39,7 @@ export function LoginPage() {
   const restart = (sessionEnded = false) => {
     setEnded(sessionEnded);
     setChosen('credentials');
-    void auth.logout().catch(() => undefined);
+    void auth.logout({ silent: true }).catch(() => undefined);
   };
 
   if (step === 'totp') return <TotpStep onRestart={restart} />;
