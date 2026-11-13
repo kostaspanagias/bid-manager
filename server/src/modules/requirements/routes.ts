@@ -158,10 +158,9 @@ router.get('/next-code', async (req, res) => {
 });
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-function sendXlsx(res: Parameters<RequestHandler>[1], buffer: Buffer, filename: string): void {
-  const ascii = filename.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+function sendXlsx(res: Parameters<RequestHandler>[1], buffer: Buffer, filename: string, asciiName: string): void {
   res.setHeader('Content-Type', XLSX_MIME);
-  res.setHeader('Content-Disposition', `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
   res.setHeader('Cache-Control', 'no-store');
   res.send(buffer);
 }
@@ -172,12 +171,12 @@ router.get('/export.xlsx', async (req, res) => {
   const filters = filtersOf(z.object(filterQuery).parse(req.query));
   const [rows, owners] = await Promise.all([listRequirements(db, req.tender.id, filters), loadOwners(db, req.tender.id)]);
   const buffer = await buildComplianceSheet(rows as ExistingRow[], owners, { title: String(req.tender.title ?? '') });
-  const ref = String(req.tender.esidis_no || req.tender.adam || '').replace(/[^\p{L}\p{N}_-]+/gu, '');
-  sendXlsx(res, buffer, `Φύλλο συμμόρφωσης${ref ? ` ${ref}` : ''}.xlsx`);
+  const ref = String(req.tender.esidis_no || req.tender.adam || '').replace(/[^A-Za-z0-9_-]+/g, '');
+  sendXlsx(res, buffer, `Φύλλο συμμόρφωσης${ref ? ` ${ref}` : ''}.xlsx`, `compliance-sheet${ref ? `-${ref}` : ''}.xlsx`);
 });
 
 router.get('/template.xlsx', async (req, res) => {
-  sendXlsx(res, await buildTemplate(await loadOwners(req.ctx.db, req.tender.id)), 'Υπόδειγμα register απαιτήσεων.xlsx');
+  sendXlsx(res, await buildTemplate(await loadOwners(req.ctx.db, req.tender.id)), 'Υπόδειγμα register απαιτήσεων.xlsx', 'register-import-template.xlsx');
 });
 
 // ------------------------------------------------------------------------------------------------------- import

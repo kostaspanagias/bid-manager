@@ -56,3 +56,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.files-name__sub {
+  display: block;
+  font-weight: var(--weight-normal);
+  font-size: var(--text-sm);
+  color: var(--c-text-muted);
+}

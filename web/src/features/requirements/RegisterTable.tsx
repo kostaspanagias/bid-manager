@@ -37,15 +37,15 @@ interface ColumnDef {
   minWidth?: number;
 }
 const COLUMNS: ColumnDef[] = [
-  { key: 'code', width: 86 },
-  { key: 'type', width: 126 },
+  { key: 'code', width: 104 },
+  { key: 'type', width: 142 },
   { key: 'text' },
-  { key: 'source_ref', width: 168, minWidth: 1240 },
-  { key: 'folder', width: 104, minWidth: 860 },
-  { key: 'owner', width: 138 },
-  { key: 'response_ref', width: 132, minWidth: 1240 },
-  { key: 'evidence_ref', width: 150 },
-  { key: 'status', width: 148 },
+  { key: 'source_ref', width: 168, minWidth: 1300 },
+  { key: 'folder', width: 104, minWidth: 1080 },
+  { key: 'owner', width: 124 },
+  { key: 'response_ref', width: 132, minWidth: 1300 },
+  { key: 'evidence_ref', width: 148 },
+  { key: 'status', width: 138 },
 ];
 const ROW_H = 36;
 const CARD_H = 78;

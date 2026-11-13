@@ -1,6 +1,17 @@
 /* Requirements register — feature styles (tokens only). */
 
 /* ---- coverage header ---- */
+.reg-coverage__title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+}
+.reg-coverage__title span {
+  margin-left: var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+}
 .reg-coverage {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -39,8 +50,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2) var(--sp-5);
-  margin: var(--sp-4) 0 0;
-  padding-top: var(--sp-3);
+  margin: var(--sp-3) 0 0;
+  padding-top: var(--sp-2);
   border-top: 1px solid var(--c-border);
   font-size: var(--text-sm);
   color: var(--c-text-muted);
@@ -415,17 +426,25 @@
 .reg-preview {
   max-height: 300px;
 }
-.reg-preview td.reg-preview__text {
-  max-width: 320px;
+.reg-preview .ui-table {
+  table-layout: fixed;
+  min-width: 560px;
+}
+.reg-preview__text {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reg-preview td.is-wrap {
+  min-width: 0;
+  max-width: none;
 }
 .reg-problems {
   margin: 0;
   padding: 0;
   list-style: none;
   white-space: normal;
-  min-width: 200px;
   font-size: var(--text-sm);
 }
 .reg-problems .is-error {
@@ -488,4 +507,13 @@
 }
 .reg-import__error {
   margin-bottom: var(--sp-3);
+}
+@media (max-width: 640px) {
+  .reg-table-wrap {
+    max-height: 76vh;
+  }
+  .reg-coverage__title span {
+    display: block;
+    margin: 2px 0 0;
+  }
 }

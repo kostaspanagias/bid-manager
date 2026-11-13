@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import type { Test } from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { addMember, addRole, as, createOrg, createTender, createUser, dbFor, missingId, type Agent, type TestTender, type TestUser } from '../../test/harness.js';
 
@@ -6,8 +7,9 @@ const HEADERS = ['Κωδικός', 'Πηγή', 'Κείμενο', 'Τύπος', '
 const quote = (v: string, d: string) => (v.includes(d) || /["\n]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v);
 const csv = (rows: string[][], { delimiter = ',', bom = false, eol = '\n' } = {}) =>
   Buffer.from((bom ? '﻿' : '') + rows.map((r) => r.map((c) => quote(c, delimiter)).join(delimiter)).join(eol) + eol, 'utf8');
-const binary = (r: { buffer: (cb: boolean) => unknown; parse: (fn: unknown) => unknown }) =>
-  r.buffer(true).parse((res: NodeJS.ReadableStream, cb: (e: Error | null, b: Buffer) => void) => {
+/** Reads a binary (XLSX) response body into a Buffer. */
+const binary = (r: Test): Test =>
+  r.buffer(true).parse((res, cb) => {
     const chunks: Buffer[] = [];
     res.on('data', (c: Buffer) => chunks.push(c));
     res.on('end', () => cb(null, Buffer.concat(chunks)));
@@ -539,7 +541,7 @@ describe('requirements — import', () => {
     ]);
     const before = (await w.api.get(w.base)).body.items;
 
-    const res = await binary(w.api.get(`${w.base}/export.xlsx`) as never) as { status: number; headers: Record<string, string>; body: Buffer };
+    const res = await binary(w.api.get(`${w.base}/export.xlsx`));
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('spreadsheetml');
     expect(res.headers['content-disposition']).toContain(`filename*=UTF-8''${encodeURIComponent('Φύλλο συμμόρφωσης')}`);
@@ -573,13 +575,13 @@ describe('requirements — import', () => {
     expect((await upload(w.api, `${copyBase}/import/commit`, res.body, 'export.xlsx')).body).toMatchObject({ created: 5, skipped: 0 });
     const strip = (rows: Record<string, unknown>[]) => rows.map(({ id: _i, tender_id: _t, created_at: _c, updated_at: _u, created_by: _b, sort: _s, changes: _ch, ...rest }) => rest);
     expect(strip((await w.api.get(copyBase)).body.items)).toEqual(strip(before));
-    const again = await binary(w.api.get(`${copyBase}/export.xlsx`) as never) as { body: Buffer };
+    const again = await binary(w.api.get(`${copyBase}/export.xlsx`));
     const wb2 = new ExcelJS.Workbook();
     await wb2.xlsx.load(again.body as unknown as ArrayBuffer);
     for (let r = 1; r <= 6; r++) expect(wb2.worksheets[0]?.getRow(r).values).toEqual(ws.getRow(r).values);
 
     // the export takes the list's filters
-    const filtered = await binary(w.api.get(`${w.base}/export.xlsx?type=scored`) as never) as { body: Buffer };
+    const filtered = await binary(w.api.get(`${w.base}/export.xlsx?type=scored`));
     const wb3 = new ExcelJS.Workbook();
     await wb3.xlsx.load(filtered.body as unknown as ArrayBuffer);
     expect(wb3.worksheets[0]?.rowCount).toBe(3);
@@ -587,7 +589,7 @@ describe('requirements — import', () => {
 
   it('XLSX: the template is an empty register sheet plus a sheet of instructions; a chosen sheet can be imported', async () => {
     const w = await world();
-    const res = await binary(w.api.get(`${w.base}/template.xlsx`) as never) as { status: number; body: Buffer };
+    const res = await binary(w.api.get(`${w.base}/template.xlsx`));
     expect(res.status).toBe(200);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(res.body as unknown as ArrayBuffer);
@@ -658,7 +660,7 @@ describe('requirements — import', () => {
     const [bulk, tBulk] = await time(() => w.api.post(`${w.base}/bulk`).send({ ids, patch: { status: 'in_progress' } }));
     expect(bulk.body).toEqual({ updated: 1000 });
     expect(await dbFor(w.org).count('audit_log', { entity: 'requirement', action: 'update', tender_id: w.tender.id })).toBe(2000);
-    const [exported, tExport] = await time(async () => binary(w.api.get(`${w.base}/export.xlsx`) as never) as Promise<{ body: Buffer }>);
+    const [exported, tExport] = await time(async () => binary(w.api.get(`${w.base}/export.xlsx`)));
     const [round, tRound] = await time(() => upload(w.api, `${w.base}/import/preview`, exported.body, 'export.xlsx'));
     expect(round.body.summary).toMatchObject({ total: 1000, unchanged: 1000 });
 

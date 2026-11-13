@@ -44,10 +44,15 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  flex-wrap: wrap;
   font-size: var(--text-sm);
 }
+.change__head > .u-muted {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .change__menu {
+  flex: none;
   margin-left: auto;
   margin-top: -4px;
   margin-bottom: -4px;

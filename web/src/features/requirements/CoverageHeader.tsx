@@ -10,7 +10,10 @@ export function CoverageHeader({ coverage, onShowMissingEvidence }: { coverage: 
   const { t } = useTranslation('requirements');
   const missing = coverage.exclusionWithoutEvidence;
   return (
-    <Card title={t('coverage.title')} subtitle={t('coverage.hint')} tone={missing > 0 ? 'red' : undefined}>
+    <Card as="section" tone={missing > 0 ? 'red' : undefined}>
+      <h3 className="reg-coverage__title">
+        {t('coverage.title')} <span>{t('coverage.hint')}</span>
+      </h3>
       <div className="reg-coverage">
         {TYPES.map((type) => {
           const c = coverage[type];

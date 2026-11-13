@@ -16,10 +16,11 @@
     "name": "Στοιχείο",
     "lead": "Lead time",
     "needed": "Χρειάζεται",
-    "lastRequest": "Τελευταία ημέρα αίτησης",
+    "lastRequest": "Αίτηση έως",
     "requested": "Ζητήθηκε",
     "expected": "Αναμένεται",
-    "arrived": "Παραλήφθηκε"
+    "arrived": "Παραλήφθηκε",
+    "arrivedShort": "Παραλαβή"
   },
   "state": {
     "not_requested": "Δεν έχει ζητηθεί",

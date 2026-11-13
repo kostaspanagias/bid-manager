@@ -8,6 +8,7 @@
  *   DELETE /:id                 → 204
  * Financial files (R18) are absent from the list and answer 403 `financial_restricted` to anyone without access.
  */
+import { useEffect, useState } from 'react';
 import { api, ApiError, type ListResponse } from '@/api/client';
 import type { FileConfidentiality, FileFolder, ID, Timestamp } from '@/api/types';
 import { tenderKeys } from '@/features/tenders/tenderApi';
@@ -116,4 +117,18 @@ export async function uploadWithProgress<T>(
     signal?.addEventListener('abort', () => xhr.abort());
     xhr.send(form);
   });
+}
+
+/** True on phone-width screens: tables drop their secondary columns and show that text under the name instead. */
+export function useIsNarrow(maxWidth = 640): boolean {
+  const query = `(max-width: ${maxWidth}px)`;
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setNarrow(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return narrow;
 }

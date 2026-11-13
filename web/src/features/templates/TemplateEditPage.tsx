@@ -297,9 +297,10 @@ export function TemplateEditPage() {
                           showKey={false}
                           meta={
                             c.payload.type === 'auto' ? (
-                              <Badge tone="info">
-                                {enumLabel('criterion_type', 'auto')}: {enumLabel('auto_rule', String(c.payload.auto_rule ?? ''))}
-                              </Badge>
+                              <>
+                                <Badge tone="info">{enumLabel('criterion_type', 'auto')}</Badge>
+                                <span>{enumLabel('auto_rule', String(c.payload.auto_rule ?? ''))}</span>
+                              </>
                             ) : null
                           }
                         />
@@ -433,19 +434,14 @@ export function TemplateEditPage() {
             <>
               {t(removing.kind === 'gate' ? 'form.removeGateMessage' : 'form.removeMessage', { name: removing.name })}
               {remove.isError && (
-                <Banner tone="red" title={errorMessage(remove.error)}>
-                  {isApiError(remove.error) && (
-                    <ul className="tpl-problem-list">
-                      {(((remove.error.details as { problems?: Problem[] } | null)?.problems ?? []) as Problem[]).map((p, i) => (
-                        <li key={i}>
-                          <strong>
-                            {p.kind ? enumLabel('template_item_kind', p.kind) : ''} {p.key}
-                          </strong>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Banner>
+                <span className="tpl-inline-error" role="alert">
+                  {errorMessage(remove.error)}{' '}
+                  {isApiError(remove.error) &&
+                    (((remove.error.details as { problems?: Problem[] } | null)?.problems ?? []) as Problem[])
+                      .map((p) => `${p.kind ? enumLabel('template_item_kind', p.kind) : ''} ${p.key ?? ''}`.trim())
+                      .filter((v, i, arr) => arr.indexOf(v) === i)
+                      .join(' · ')}
+                </span>
               )}
             </>
           )

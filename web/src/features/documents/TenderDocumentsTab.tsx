@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '@/api/client';
-import { startDownload } from '@/features/files/filesApi';
+import { startDownload, useIsNarrow } from '@/features/files/filesApi';
 import { useTender } from '@/features/tenders/tenderContext';
 import { formatDate } from '@/lib/dates';
 import { enumLabel } from '@/lib/enums';
@@ -17,6 +17,7 @@ export function TenderDocumentsTab() {
   const { tenderId, canWrite, isActive, T } = useTender();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const narrow = useIsNarrow();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [unlinking, setUnlinking] = useState<LinkedDocument | null>(null);
 
@@ -45,7 +46,7 @@ export function TenderDocumentsTab() {
     }
   };
 
-  const columns: Column<LinkedDocument>[] = [
+  const allColumns: Column<LinkedDocument>[] = [
     { key: 'type', header: t('columns.type'), width: 150, render: (d) => <Badge tone={d.type === 'cv' ? 'info' : 'neutral'}>{enumLabel('company_document_type', d.type)}</Badge> },
     {
       key: 'title',
@@ -54,7 +55,21 @@ export function TenderDocumentsTab() {
       render: (d) => (
         <span className="docs-title">
           <span className="docs-title__main">{d.title}</span>
+          {narrow && <span className="docs-title__sub">{[enumLabel('company_document_type', d.type), d.expires_at && `${t('columns.expires')} ${formatDate(d.expires_at)}`].filter(Boolean).join(' · ')}</span>}
           {d.person_name && <span className="docs-title__sub">{t('person', { name: d.person_name })}</span>}
+          {narrow && (
+            <span>
+              {d.expires_before_T ? (
+                <Badge tone="red" dot>
+                  {t('tender.expiresBeforeT')}
+                </Badge>
+              ) : (
+                <Badge tone="green" dot>
+                  {t('tender.validOnT')}
+                </Badge>
+              )}
+            </span>
+          )}
         </span>
       ),
     },
@@ -97,6 +112,8 @@ export function TenderDocumentsTab() {
     },
   ];
 
+  const columns = narrow ? allColumns.filter((c) => ['title', 'actions'].includes(c.key)) : allColumns;
+
   const linkButton = canWrite ? (
     <Button variant="primary" icon="plus" onClick={() => setPickerOpen(true)}>
       {t('tender.link')}
@@ -108,7 +125,7 @@ export function TenderDocumentsTab() {
       <PageHeader level={2} title={t('tender.title')} subtitle={t('tender.subtitle')} actions={linkButton} />
       {!isActive && <Banner tone="info">{t('tender.closedNote')}</Banner>}
       {expired > 0 && (
-        <Banner tone="red" title={t('tender.bannerTitle', { count: expired, date: formatDate(tDate) })}>
+        <Banner className="docs-attention" tone="red" title={t('tender.bannerTitle', { count: expired, date: formatDate(tDate) })}>
           {t('tender.bannerText')}
         </Banner>
       )}

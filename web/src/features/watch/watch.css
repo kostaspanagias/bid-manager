@@ -2,7 +2,7 @@
   margin-bottom: var(--sp-4);
 }
 .watch-col-name {
-  min-width: 240px;
+  min-width: 170px;
 }
 .watch-notes {
   font-style: italic;
@@ -17,6 +17,16 @@
   align-items: flex-start;
   gap: var(--sp-1);
 }
+.watch-state .ui-btn {
+  margin-top: 2px;
+}
+.watch-lead-text {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
 .watch-legend {
   margin: var(--sp-3) 0 0;
   font-size: var(--text-sm);
@@ -28,4 +38,78 @@
 }
 .watch-lead > :only-child {
   grid-column: 1 / -1;
+}
+
+.watch-owner {
+  margin-left: var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+}
+
+.watch-lead-text {
+  white-space: normal;
+  max-width: 118px;
+}
+
+/* Table from 1000px up, cards below */
+.watch-cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+@media (max-width: 999px) {
+  .watch-table {
+    display: none;
+  }
+  .watch-cards {
+    display: flex;
+  }
+}
+.watch-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--tone-solid, var(--c-border-strong));
+  border-radius: var(--radius-md);
+}
+.watch-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  width: 100%;
+}
+.watch-card__state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.watch-card__dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--sp-2) var(--sp-3);
+  width: 100%;
+  margin: 0;
+}
+.watch-card__dates dt {
+  color: var(--c-text-muted);
+  font-size: var(--text-xs);
+}
+.watch-card__dates dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.watch-card__dates dd.watch-card__plain {
+  font-family: var(--font-sans);
+}
+.watch-card p {
+  margin: 0;
 }

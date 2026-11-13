@@ -19,7 +19,7 @@
 }
 .tpl-row {
   display: grid;
-  grid-template-columns: minmax(3.5rem, max-content) minmax(0, 1fr) auto;
+  grid-template-columns: 6.5rem minmax(0, 1fr) auto;
   gap: var(--sp-1) var(--sp-3);
   align-items: start;
   padding: var(--sp-2) var(--sp-4);
@@ -39,7 +39,9 @@
 }
 .tpl-key {
   display: inline-block;
-  max-width: 11rem;
+  justify-self: start;
+  max-width: 100%;
+  margin-top: 1px;
   padding: 1px var(--sp-2);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
@@ -192,6 +194,7 @@
 }
 .tpl-diff-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   margin-top: var(--sp-1);
   font-size: var(--text-sm);
@@ -220,8 +223,17 @@
 }
 @media (max-width: 560px) {
   .tpl-row {
+    grid-template-columns: minmax(0, 1fr) auto;
     padding-left: var(--sp-3);
     padding-right: var(--sp-3);
+  }
+  /* key and actions share the first line; the text gets the full width below */
+  .tpl-row:not(.tpl-row--nokey) > .tpl-row__main {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .tpl-row:not(.tpl-row--nokey) > .tpl-key {
+    align-self: center;
   }
   .tpl-diff-table th {
     width: 6rem;
@@ -261,4 +273,15 @@
 }
 .tpl-up svg {
   transform: rotate(180deg);
+}
+
+.tpl-inline-error {
+  display: block;
+  margin-top: var(--sp-2);
+  color: var(--c-red-fg);
+  font-weight: var(--weight-medium);
+}
+.tpl-row__meta > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { errorMessage } from '@/api/client';
 import { COMPANY_DOCUMENT_TYPES, type CompanyDocumentType } from '@/api/types';
 import { useAuth } from '@/features/auth/AuthProvider';
-import { startDownload } from '@/features/files/filesApi';
+import { startDownload, useIsNarrow } from '@/features/files/filesApi';
+import { formatDate } from '@/lib/dates';
 import { enumLabel, enumOptions } from '@/lib/enums';
 import {
   Badge,
@@ -60,6 +61,7 @@ export function CompanyDocumentsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const isManager = hasRole('admin', 'bid_manager');
+  const narrow = useIsNarrow();
 
   const [search, setSearch] = useState('');
   const [type, setType] = useState<CompanyDocumentType | ''>('');
@@ -124,7 +126,7 @@ export function CompanyDocumentsPage() {
     }
   };
 
-  const columns: Column<CompanyDocumentView>[] = [
+  const allColumns: Column<CompanyDocumentView>[] = [
     { key: 'type', header: t('columns.type'), width: 150, render: (d) => <Badge tone={d.type === 'cv' ? 'info' : 'neutral'}>{enumLabel('company_document_type', d.type)}</Badge> },
     {
       key: 'title',
@@ -133,8 +135,14 @@ export function CompanyDocumentsPage() {
       render: (d) => (
         <span className="docs-title">
           <span className="docs-title__main">{d.title}</span>
+          {narrow && <span className="docs-title__sub">{[enumLabel('company_document_type', d.type), d.expires_at && `${t('columns.expires')} ${formatDate(d.expires_at)}`].filter(Boolean).join(' · ')}</span>}
           {d.person_name && <span className="docs-title__sub">{t('person', { name: d.person_name })}</span>}
-          {d.notes && <span className="docs-title__sub">{d.notes}</span>}
+          {d.notes && !narrow && <span className="docs-title__sub">{d.notes}</span>}
+          {narrow && (
+            <span>
+              <DocumentStatusBadge doc={d} />
+            </span>
+          )}
         </span>
       ),
     },
@@ -179,6 +187,7 @@ export function CompanyDocumentsPage() {
       : []),
   ];
 
+  const columns = narrow ? allColumns.filter((c) => ['title', 'file', 'actions'].includes(c.key)) : allColumns;
   const filtered = !!(needle || type || status);
 
   return (
@@ -203,7 +212,7 @@ export function CompanyDocumentsPage() {
       />
 
       {(expired > 0 || expiring > 0) && (
-        <Banner tone={expired > 0 ? 'red' : 'orange'} title={t('attention', { expired, expiring })} />
+        <Banner className="docs-attention" tone={expired > 0 ? 'red' : 'orange'} title={t('attention', { expired, expiring })} />
       )}
 
       <FilterBar

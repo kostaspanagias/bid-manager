@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { errorMessage } from '@/api/client';
 import type { ID } from '@/api/types';
 import { cx } from '@/lib/cx';
-import { enumLabel } from '@/lib/enums';
 import { Badge, Banner, Button, Checkbox, Field, FileDropInput, Modal, Select, Spinner, Table, useToast, type Column, type Tone } from '@/ui';
 import {
   IMPORT_FIELDS,
@@ -141,33 +140,36 @@ export function ImportWizard({ tenderId, onClose, onImported }: Props) {
   const fieldNames = (fields: string[]) =>
     [...new Set(fields.map((f) => (f === 'owner_user_id' || f === 'owner_role_key' ? 'owner' : f)))].map((f) => t(`columns.${f}`)).join(', ');
   const previewColumns: Column<ImportRow>[] = [
-    { key: 'row', header: t('import.row'), width: 64, mono: true, align: 'right' },
-    { key: 'code', header: t('columns.code'), width: 90, mono: true },
-    { key: 'action', header: t('import.result'), width: 120, render: (r) => <Badge tone={ACTION_TONE[r.action]}>{t(`import.action.${r.action}`)}</Badge> },
-    { key: 'text', header: t('columns.text'), className: 'reg-preview__text', render: (r) => <span title={r.values.text}>{r.values.text ?? '—'}</span> },
-    { key: 'type', header: t('columns.type'), render: (r) => (r.values.type ? enumLabel('requirement_type', r.values.type) : '—') },
+    { key: 'row', header: t('import.row'), width: 76, mono: true },
+    { key: 'code', header: t('columns.code'), width: 92, mono: true },
+    { key: 'action', header: t('import.result'), width: 124, render: (r) => <Badge tone={ACTION_TONE[r.action]}>{t(`import.action.${r.action}`)}</Badge> },
     {
-      key: 'problems',
-      header: t('import.problems'),
-      render: (r) =>
-        r.errors.length + r.warnings.length + r.kept.length + r.changed.length === 0 ? (
-          <span className="u-faint">—</span>
-        ) : (
-          <ul className="reg-problems">
-            {r.errors.map((p, i) => (
-              <li key={`e${i}`} className="is-error">
-                {problemText(p)}
-              </li>
-            ))}
-            {r.warnings.map((p, i) => (
-              <li key={`w${i}`} className="is-warning">
-                {problemText(p)}
-              </li>
-            ))}
-            {r.action === 'update' && r.changed.length > 0 && <li className="is-kept">{t('import.changedFields', { fields: fieldNames(r.changed) })}</li>}
-            {r.action !== 'error' && r.kept.length > 0 && <li className="is-kept">{t('import.keptFields', { fields: fieldNames(r.kept) })}</li>}
-          </ul>
-        ),
+      key: 'text',
+      header: t('import.textAndProblems'),
+      wrap: true,
+      render: (r) => (
+        <>
+          <span className="reg-preview__text" title={r.values.text}>
+            {r.values.text ?? <span className="u-faint">—</span>}
+          </span>
+          {r.errors.length + r.warnings.length + r.kept.length + r.changed.length > 0 && (
+            <ul className="reg-problems">
+              {r.errors.map((p, i) => (
+                <li key={`e${i}`} className="is-error">
+                  {problemText(p)}
+                </li>
+              ))}
+              {r.warnings.map((p, i) => (
+                <li key={`w${i}`} className="is-warning">
+                  {problemText(p)}
+                </li>
+              ))}
+              {r.action === 'update' && r.changed.length > 0 && <li className="is-kept">{t('import.changedFields', { fields: fieldNames(r.changed) })}</li>}
+              {r.action !== 'error' && r.kept.length > 0 && <li className="is-kept">{t('import.keptFields', { fields: fieldNames(r.kept) })}</li>}
+            </ul>
+          )}
+        </>
+      ),
     },
   ];
 

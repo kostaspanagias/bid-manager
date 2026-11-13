@@ -80,6 +80,7 @@ export function HandoffsView({ data, tenderId, canWrite, loading, onEdit }: Prop
     {
       key: 'state',
       header: t('common:labels.status'),
+      wrap: true,
       render: (x) => {
         const b = handoffBadge(x);
         const h = x.handoff;
@@ -97,6 +98,16 @@ export function HandoffsView({ data, tenderId, canWrite, loading, onEdit }: Prop
               <span className="tasks-desc">{t('handoffs.deliveredBy', { name: nameOf(h.delivered_by) || '—', at: formatDateTime(h.delivered_at) })}</span>
             )}
             {(h?.receive_note || (h?.state === 'delivered' && h.delivery_note)) && <span className="tasks-desc">«{h.receive_note ?? h.delivery_note}»</span>}
+            {canWrite && h?.can_receive && (h.state === 'delivered' || !h.can_deliver) && (
+              <Button size="sm" variant="primary" icon="check" loading={handoff.isPending && handoff.variables?.id === x.id} onClick={() => receive(x)}>
+                {t('handoffs.receive')}
+              </Button>
+            )}
+            {canWrite && h?.can_deliver && (
+              <Button size="sm" icon="upload" loading={handoff.isPending && handoff.variables?.id === x.id} onClick={() => handoff.mutate({ id: x.id, action: 'deliver' })}>
+                {t('handoffs.deliver')}
+              </Button>
+            )}
           </div>
         );
       },
@@ -112,16 +123,6 @@ export function HandoffsView({ data, tenderId, canWrite, loading, onEdit }: Prop
         const live = x.status === 'open' || x.status === 'in_progress';
         return (
           <CellActions>
-            {h.can_receive && (h.state === 'delivered' || !h.can_deliver) && (
-              <Button size="sm" variant="primary" icon="check" loading={handoff.isPending && handoff.variables?.id === x.id} onClick={() => receive(x)}>
-                {t('handoffs.receive')}
-              </Button>
-            )}
-            {h.can_deliver && (
-              <Button size="sm" icon="upload" loading={handoff.isPending && handoff.variables?.id === x.id} onClick={() => handoff.mutate({ id: x.id, action: 'deliver' })}>
-                {t('handoffs.deliver')}
-              </Button>
-            )}
             <Menu
               label={`${t('common:actions.more')}: ${x.title}`}
               items={[

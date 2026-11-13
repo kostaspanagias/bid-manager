@@ -111,65 +111,73 @@ async function withPage(name: string, user: { id: string }, width: number, fn: (
 for (const width of [1280, 375]) {
   await withPage('files-admin', admin, width, async (page, shot) => {
     await page.goto(`${base}/tenders/${tender.id}/files`);
-    await page.getByText('Οικονομική προσφορά - τελική.xlsx').waitFor();
+    await page.getByText('Οικονομική προσφορά - τελική.xlsx').first().waitFor();
     await shot('list');
     // real upload through the UI into the financial folder
     await page.getByLabel('Φάκελος προορισμού').selectOption('financial');
     await page.locator('.ui-filedrop__input').setInputFiles([{ name: 'Ανάλυση τιμών.xlsx', mimeType: 'application/vnd.ms-excel', buffer: Buffer.alloc(400_000, 1) }, { name: 'κενό.txt', mimeType: 'text/plain', buffer: Buffer.alloc(0) }]);
     await page.getByText('Ανέβηκε', { exact: true }).first().waitFor();
-    await page.getByText('Ανάλυση τιμών.xlsx').nth(1).waitFor();
+    await page.locator('.files-sections').getByText('Ανάλυση τιμών.xlsx').first().waitFor();
     await shot('uploaded');
-    await page.getByRole('button', { name: 'Ενέργειες για «Τεχνική προσφορά v3.docx»' }).click();
-    await shot('menu');
+    const trigger = page.getByRole('button', { name: 'Ενέργειες για «Τεχνική προσφορά v3.docx»' });
+    await trigger.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await trigger.click();
+    await page.waitForTimeout(400);
+    console.log(width, 'menuitems after click:', await page.getByRole('menuitem').count(), 'toasts:', await page.locator('[class*=toast]').count());
+    await page.screenshot({ path: `${out}/files-admin-menu-${width}.png` });
+    console.log(width, 'menuitems after screenshot:', await page.getByRole('menuitem').count());
+    if (!(await page.getByRole('menuitem').count())) await trigger.click();
     await page.getByRole('menuitem', { name: 'Μετονομασία / μετακίνηση' }).click();
     await page.getByRole('dialog').waitFor();
     await shot('edit');
   });
   await withPage('files-technical', tech, width, async (page, shot) => {
     await page.goto(`${base}/tenders/${tender.id}/files`);
-    await page.getByText('Τεχνική προσφορά v3.docx').waitFor();
+    await page.getByText('Τεχνική προσφορά v3.docx').first().waitFor();
     if (await page.getByText('Οικονομική προσφορά').count()) problems.push('technical member sees a financial file name');
     if (await page.locator('.files-sections').getByText('Οικονομική').count()) problems.push('technical member sees the financial section');
     await shot('list');
   });
   await withPage('files-viewer', viewer, width, async (page, shot) => {
     await page.goto(`${base}/tenders/${tender.id}/files`);
-    await page.getByText('Τεχνική προσφορά v3.docx').waitFor();
+    await page.getByText('Τεχνική προσφορά v3.docx').first().waitFor();
     await shot('list');
   });
   await withPage('tenderdocs', admin, width, async (page, shot) => {
     await page.goto(`${base}/tenders/${tender.id}/documents`);
-    await page.getByText('Φορολογική ενημερότητα').waitFor();
+    await page.locator('table').getByText('Φορολογική ενημερότητα').first().waitFor();
     await shot('list');
     await page.getByRole('button', { name: 'Σύνδεση εγγράφου' }).click();
-    await page.getByText('ISO 27001:2022').waitFor();
+    await page.getByText('ISO 27001:2022').first().waitFor();
     await shot('picker');
   });
   await withPage('companydocs', admin, width, async (page, shot) => {
     await page.goto(`${base}/company-documents`);
-    await page.getByText('Φορολογική ενημερότητα').waitFor();
+    await page.locator('table').getByText('Φορολογική ενημερότητα').first().waitFor();
     await shot('list');
     await page.getByRole('button', { name: 'Νέο έγγραφο' }).click();
     await page.getByRole('dialog').getByLabel('Τύπος').selectOption('cv');
     await shot('add');
     await page.getByRole('button', { name: 'Άκυρο' }).click();
     await page.getByRole('button', { name: 'Ενέργειες για «Φορολογική ενημερότητα»' }).click();
-    await shot('menu');
+    await page.getByRole('menuitem').first().waitFor();
+    await page.screenshot({ path: `${out}/companydocs-menu-${width}.png` });
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'GDPR' }).click();
     await page.getByRole('dialog').getByLabel('Λογαριασμός χρήστη').selectOption(tech.id);
     await page.getByRole('button', { name: 'Προεπισκόπηση' }).click();
-    await page.getByText('Θα διαγραφούν').waitFor();
+    await page.getByText('Θα διαγραφούν').first().waitFor();
     await page.getByLabel(/Για επιβεβαίωση/).fill('ΔΙΑΓΡΑΦΗ');
     await shot('gdpr-erase');
     await page.getByRole('tab', { name: 'Διατήρηση αρχείων' }).click();
-    await page.getByText('Χωρίς αυτόματη διαγραφή').waitFor();
+    await page.getByText('Χωρίς αυτόματη διαγραφή').first().waitFor();
     await page.getByLabel('Χωρίς αυτόματη διαγραφή').uncheck();
     await shot('gdpr-retention');
   });
   await withPage('companydocs-member', tech, width, async (page, shot) => {
     await page.goto(`${base}/company-documents`);
-    await page.getByText('Φορολογική ενημερότητα').waitFor();
+    await page.locator('table').getByText('Φορολογική ενημερότητα').first().waitFor();
     if (await page.getByText('Άννα Καραγιάννη').count()) problems.push('member sees an unlinked CV');
     await shot('list');
   });

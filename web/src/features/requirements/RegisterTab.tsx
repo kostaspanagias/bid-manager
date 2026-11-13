@@ -31,8 +31,7 @@ import './register.css';
 
 const download = (url: string) => {
   const a = document.createElement('a');
-  a.href = url;
-  a.download = '';
+  a.href = url; // the server answers with Content-Disposition: attachment, so the page stays where it is
   document.body.appendChild(a);
   a.click();
   a.remove();

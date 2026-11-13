@@ -5,6 +5,7 @@ import { errorMessage } from '@/api/client';
 import { FILE_FOLDERS, type FileFolder } from '@/api/types';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useTender } from '@/features/tenders/tenderContext';
+import { formatDate } from '@/lib/dates';
 import { enumLabel } from '@/lib/enums';
 import {
   Badge,
@@ -30,7 +31,7 @@ import {
   useToast,
   type Column,
 } from '@/ui';
-import { deleteFile, fileDownloadUrl, filesKeys, getFile, listFiles, patchFile, startDownload, uploadTenderFile, type TenderFile } from './filesApi';
+import { deleteFile, fileDownloadUrl, filesKeys, getFile, listFiles, patchFile, startDownload, uploadTenderFile, useIsNarrow, type TenderFile } from './filesApi';
 import './files.css';
 
 /** Display order: what arrives from the authority first, then the three offer folders, then the rest. */
@@ -52,6 +53,7 @@ export function FilesTab() {
   const { user, hasRole, canEdit } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const narrow = useIsNarrow();
 
   // Files stay writable after a tender is closed (receipts, the submitted offer) — only viewers are read-only.
   const mayWrite = canWrite || (!isActive && canEdit);
@@ -117,7 +119,7 @@ export function FilesTab() {
 
   const mayManage = (file: TenderFile) => mayWrite && (hasRole('admin', 'bid_manager') || file.uploaded_by === user?.id);
 
-  const columns: Column<TenderFile>[] = [
+  const allColumns: Column<TenderFile>[] = [
     {
       key: 'filename',
       header: t('columns.name'),
@@ -125,7 +127,14 @@ export function FilesTab() {
       render: (f) => (
         <span className="files-name">
           <Icon name={f.confidentiality === 'financial' ? 'lock' : 'file'} />
-          <span className="files-name__text">{f.filename}</span>
+          <span className="files-name__text">
+            {f.filename}
+            {narrow && (
+              <span className="files-name__sub">
+                {[formatFileSize(f.size), f.uploaded_by_name, formatDate(f.created_at), f.label].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </span>
           {f.confidentiality === 'financial' && f.folder !== 'financial' && (
             <Badge tone="orange" title={t('confidentialHint')}>
               {t('confidential')}
@@ -134,9 +143,9 @@ export function FilesTab() {
         </span>
       ),
     },
-    { key: 'label', header: t('columns.label'), render: (f) => (f.label ? <Badge>{f.label}</Badge> : <span className="u-faint">—</span>) },
+    { key: 'label', header: t('columns.label'), width: 170, render: (f) => (f.label ? <Badge>{f.label}</Badge> : <span className="u-faint">—</span>) },
     { key: 'size', header: t('columns.size'), align: 'right', mono: true, width: 100, render: (f) => formatFileSize(f.size) },
-    { key: 'uploaded_by_name', header: t('columns.uploader'), render: (f) => f.uploaded_by_name ?? <span className="u-faint">—</span> },
+    { key: 'uploaded_by_name', header: t('columns.uploader'), width: 210, render: (f) => f.uploaded_by_name ?? <span className="u-faint">—</span> },
     { key: 'created_at', header: t('columns.date'), mono: true, width: 150, render: (f) => <DateText value={f.created_at} withTime /> },
     {
       key: 'actions',
@@ -163,6 +172,7 @@ export function FilesTab() {
     },
   ];
 
+  const columns = narrow ? allColumns.filter((c) => c.key === 'filename' || c.key === 'actions') : allColumns;
   const files = query.data ?? [];
 
   return (

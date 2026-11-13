@@ -80,6 +80,43 @@ export function WatchTab() {
   const late = rows.filter((w) => !w.request_overdue && (w.state === 'late' || (w.arrives_after_needed && w.state !== 'arrived')));
   const today = todayAthens();
 
+  const stateBadges = (w: WatchView) => (
+    <>
+      {w.request_overdue ? (
+        <Badge tone="red" dot>
+          {t('requestOverdue')}
+        </Badge>
+      ) : (
+        <Badge tone={STATE_TONE[w.state]} dot>
+          {t(`state.${w.state}`)}
+        </Badge>
+      )}
+      {w.arrives_after_needed && <Badge tone="orange">{t('afterNeeded')}</Badge>}
+    </>
+  );
+  const quickButton = (w: WatchView) =>
+    !canWrite || w.arrived_at ? null : !w.requested_at ? (
+      <Button size="sm" variant={w.request_overdue ? 'primary' : 'secondary'} onClick={() => quick.mutate({ item: w, body: { requested_at: today }, done: t('toast.requested') })}>
+        {t('requestedToday')}
+      </Button>
+    ) : (
+      <Button size="sm" onClick={() => quick.mutate({ item: w, body: { arrived_at: today }, done: t('toast.arrived') })}>
+        {t('arrivedToday')}
+      </Button>
+    );
+  const menu = (w: WatchView) => (
+    <Menu
+      label={`${t('common:actions.more')}: ${w.name}`}
+      items={[
+        { label: t('common:actions.edit'), icon: 'edit', onSelect: () => setEditing({ mode: 'edit', item: w }) },
+        !w.requested_at && !w.arrived_at && { label: t('arrivedToday'), icon: 'check', onSelect: () => quick.mutate({ item: w, body: { arrived_at: today }, done: t('toast.arrived') }) },
+        (!w.from_template || data?.can_manage) && { label: t('common:actions.delete'), icon: 'trash', danger: true, separatorBefore: true, onSelect: () => setRemoving(w) },
+      ]}
+    />
+  );
+  const leadText = (w: WatchView) =>
+    w.lead_value == null ? t('leadOpen') : t(w.lead_unit === 'calendar' ? 'common:labels.calendarDays' : 'common:labels.workingDays', { count: w.lead_value });
+
   const columns: Column<WatchView>[] = [
     {
       key: 'name',
@@ -89,21 +126,11 @@ export function WatchTab() {
       render: (w) => (
         <>
           <strong>{w.name}</strong>
+          <span className="watch-owner">{ownerLabel(w) || t('common:labels.unassigned')}</span>
           {w.checks && <div className="tasks-desc">{w.checks}</div>}
           {w.notes && <div className="tasks-desc watch-notes">{w.notes}</div>}
         </>
       ),
-    },
-    { key: 'owner', header: t('common:labels.owner'), render: (w) => ownerLabel(w) || <span className="u-faint">—</span> },
-    {
-      key: 'lead',
-      header: t('columns.lead'),
-      render: (w) =>
-        w.lead_value == null ? (
-          <span className="u-muted">{t('leadOpen')}</span>
-        ) : (
-          t(w.lead_unit === 'calendar' ? 'common:labels.calendarDays' : 'common:labels.workingDays', { count: w.lead_value })
-        ),
     },
     {
       key: 'needed_at',
@@ -113,6 +140,9 @@ export function WatchTab() {
         <>
           <DateText value={w.needed_at} />
           {w.needed_milestone_key && <Badge className="tasks-chip" title={w.needed_milestone_name ?? undefined}>{w.needed_milestone_key}</Badge>}
+          <span className="watch-lead-text">
+            {t('columns.lead')}: {leadText(w)}
+          </span>
         </>
       ),
     },
@@ -124,7 +154,6 @@ export function WatchTab() {
         w.request_overdue ? (
           <span className="tasks-overdue">
             <DateText value={w.last_request_date} />
-            <Badge tone="red">{t('requestOverdue')}</Badge>
           </span>
         ) : (
           <span className={w.requested_at || w.arrived_at ? 'u-faint' : undefined}>
@@ -143,48 +172,18 @@ export function WatchTab() {
         </span>
       ),
     },
-    { key: 'arrived_at', header: t('columns.arrived'), mono: true, render: (w) => <DateText value={w.arrived_at} /> },
+    { key: 'arrived_at', header: t('columns.arrivedShort'), mono: true, render: (w) => <DateText value={w.arrived_at} /> },
     {
       key: 'state',
       header: t('common:labels.status'),
       render: (w) => (
         <span className="watch-state">
-          <Badge tone={STATE_TONE[w.state]} dot>
-            {t(`state.${w.state}`)}
-          </Badge>
-          {w.arrives_after_needed && <Badge tone="orange">{t('afterNeeded')}</Badge>}
+          {stateBadges(w)}
+          {quickButton(w)}
         </span>
       ),
     },
-    {
-      key: 'actions',
-      header: t('common:labels.actions'),
-      srOnlyHeader: true,
-      align: 'right',
-      render: (w) =>
-        canWrite && (
-          <CellActions>
-            {!w.requested_at && !w.arrived_at && (
-              <Button size="sm" variant={w.request_overdue ? 'primary' : 'secondary'} onClick={() => quick.mutate({ item: w, body: { requested_at: today }, done: t('toast.requested') })}>
-                {t('requestedToday')}
-              </Button>
-            )}
-            {w.requested_at && !w.arrived_at && (
-              <Button size="sm" icon="check" onClick={() => quick.mutate({ item: w, body: { arrived_at: today }, done: t('toast.arrived') })}>
-                {t('arrivedToday')}
-              </Button>
-            )}
-            <Menu
-              label={`${t('common:actions.more')}: ${w.name}`}
-              items={[
-                { label: t('common:actions.edit'), icon: 'edit', onSelect: () => setEditing({ mode: 'edit', item: w }) },
-                !w.requested_at && !w.arrived_at && { label: t('arrivedToday'), icon: 'check', onSelect: () => quick.mutate({ item: w, body: { arrived_at: today }, done: t('toast.arrived') }) },
-                (!w.from_template || data?.can_manage) && { label: t('common:actions.delete'), icon: 'trash', danger: true, separatorBefore: true, onSelect: () => setRemoving(w) },
-              ]}
-            />
-          </CellActions>
-        ),
-    },
+    { key: 'actions', header: t('common:labels.actions'), srOnlyHeader: true, align: 'right', render: (w) => canWrite && <CellActions>{menu(w)}</CellActions> },
   ];
 
   return (
@@ -226,14 +225,70 @@ export function WatchTab() {
           {errorMessage(query.error)}
         </Banner>
       ) : (
-        <Table
-          caption={t('title')}
-          columns={columns}
-          rows={rows}
-          loading={query.isPending}
-          rowTone={watchTone}
-          empty={<EmptyState compact icon="calendar" title={t('empty')} description={t('emptyHint')} />}
-        />
+        <>
+          <div className="watch-table">
+            <Table
+              caption={t('title')}
+              columns={columns}
+              rows={rows}
+              loading={query.isPending}
+              dense
+              rowTone={watchTone}
+              empty={<EmptyState compact icon="calendar" title={t('empty')} description={t('emptyHint')} />}
+            />
+          </div>
+          {/* Phones and narrow windows: one card per item instead of a nine-column table */}
+          <ul className="watch-cards" aria-label={t('title')}>
+            {rows.length === 0 && !query.isPending && (
+              <li>
+                <EmptyState compact icon="calendar" title={t('empty')} description={t('emptyHint')} />
+              </li>
+            )}
+            {rows.map((w) => {
+              const tone = watchTone(w);
+              const cell = (label: string, value: string | null, cls?: string) => (
+                <div>
+                  <dt>{label}</dt>
+                  <dd className={cls}>
+                    <DateText value={value} />
+                  </dd>
+                </div>
+              );
+              return (
+                <li key={w.id} className={`watch-card${tone ? ` ui-tone-${tone}` : ''}`}>
+                  <div className="watch-card__head">
+                    <div>
+                      <strong>{w.name}</strong>
+                      <span className="watch-owner">{ownerLabel(w) || t('common:labels.unassigned')}</span>
+                    </div>
+                    {canWrite && menu(w)}
+                  </div>
+                  <div className="watch-card__state">{stateBadges(w)}</div>
+                  <dl className="watch-card__dates">
+                    <div>
+                      <dt>{t('columns.needed')}</dt>
+                      <dd>
+                        <DateText value={w.needed_at} />
+                        {w.needed_milestone_key && <Badge className="tasks-chip">{w.needed_milestone_key}</Badge>}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t('columns.lead')}</dt>
+                      <dd className="watch-card__plain">{leadText(w)}</dd>
+                    </div>
+                    {cell(t('columns.lastRequest'), w.last_request_date, w.request_overdue ? 'u-text-red' : undefined)}
+                    {cell(t('columns.requested'), w.requested_at)}
+                    {cell(t('columns.expected'), w.expected_at, w.state === 'late' || (w.arrives_after_needed && !w.arrived_at) ? 'u-text-orange' : undefined)}
+                    {cell(t('columns.arrived'), w.arrived_at)}
+                  </dl>
+                  {w.checks && <p className="tasks-desc">{w.checks}</p>}
+                  {w.notes && <p className="tasks-desc watch-notes">{w.notes}</p>}
+                  {quickButton(w)}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
       <p className="watch-legend u-muted">{t('legend')}</p>
 
