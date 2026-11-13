@@ -82,15 +82,6 @@ export function DeadlineDialog({ onClose }: { onClose: () => void }) {
           <Field label={t('deadline.new')} required hint={t('deadline.current', { date: formatDateTime(tender.submission_deadline_at) })} className="u-span-2">
             <DateTimeInput value={deadline} onChange={setDeadline} autoFocus />
           </Field>
-          <Field label={t('deadline.source')}>
-            <Select value={source} onChange={(e) => setSource(e.target.value as ChangeSource)} options={enumOptions('change_source', CHANGE_SOURCES)} />
-          </Field>
-          <Field label={t('deadline.reference')} hint={t('deadline.referenceHint')}>
-            <Input value={reference} onChange={(e) => setReference(e.target.value)} maxLength={500} autoComplete="off" />
-          </Field>
-          <Field label={t('deadline.note')} hint={t('deadline.noteHint')} className="u-span-2">
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={2000} />
-          </Field>
         </div>
 
         <section className="diff" aria-live="polite" aria-busy={stale}>
@@ -172,6 +163,18 @@ export function DeadlineDialog({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </section>
+
+        <div className="u-form-grid diff__log">
+          <Field label={t('deadline.source')}>
+            <Select value={source} onChange={(e) => setSource(e.target.value as ChangeSource)} options={enumOptions('change_source', CHANGE_SOURCES)} />
+          </Field>
+          <Field label={t('deadline.reference')} hint={t('deadline.referenceHint')}>
+            <Input value={reference} onChange={(e) => setReference(e.target.value)} maxLength={500} autoComplete="off" />
+          </Field>
+          <Field label={t('deadline.note')} hint={t('deadline.noteHint')} className="u-span-2">
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={2000} />
+          </Field>
+        </div>
       </div>
     </Modal>
   );

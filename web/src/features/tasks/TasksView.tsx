@@ -167,6 +167,7 @@ export function TasksView({ data, tenderId, canWrite, loading, onEdit }: Props) 
         </div>
       </FilterBar>
 
+      <div className="tasks-table">
       <Table
         caption={t('views.tasks')}
         columns={columns}
@@ -188,6 +189,28 @@ export function TasksView({ data, tenderId, canWrite, loading, onEdit }: Props) 
           />
         }
       />
+      </div>
+      {/* Phones: the same cells stacked as one card per task */}
+      <ul className="task-cards" aria-label={t('views.tasks')}>
+        {rows.length === 0 && (
+          <li>
+            <EmptyState compact icon="inbox" title={all.length === 0 ? t('tasks.empty') : t('common:state.emptyFiltered')} />
+          </li>
+        )}
+        {rows.map((x, i) => (
+          <li key={x.id} className={`task-card${x.overdue ? ' ui-tone-red' : ''}${x.status === 'cancelled' || x.status === 'done' ? ' is-off' : ''}`}>
+            <div className="task-card__head">
+              <div>{columns[0]!.render!(x, i)}</div>
+              {columns[4]!.render!(x, i)}
+            </div>
+            <div className="task-card__date">{columns[2]!.render!(x, i)}</div>
+            <div className="task-card__controls">
+              {columns[1]!.render!(x, i)}
+              {columns[3]!.render!(x, i)}
+            </div>
+          </li>
+        ))}
+      </ul>
 
       <ConfirmDialog
         open={removing !== null}

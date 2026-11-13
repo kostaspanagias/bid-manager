@@ -440,6 +440,43 @@
   min-width: 0;
   max-width: none;
 }
+.reg-preview__rowno {
+  display: none;
+  color: var(--c-text-faint);
+  font-size: var(--text-xs);
+}
+@media (max-width: 640px) {
+  /* phones: drop the row-number column (shown under the text instead) and let the text take two lines */
+  .reg-preview .ui-table {
+    min-width: 0;
+  }
+  .reg-preview th:first-child,
+  .reg-preview td:first-child {
+    display: none;
+  }
+  .reg-preview th:nth-child(2),
+  .reg-preview td:nth-child(2) {
+    width: 84px !important;
+    padding-left: var(--sp-3);
+  }
+  .reg-preview th:nth-child(3) {
+    width: 104px !important;
+  }
+  .reg-preview th,
+  .reg-preview td {
+    padding-left: var(--sp-2);
+    padding-right: var(--sp-2);
+  }
+  .reg-preview__text {
+    display: -webkit-box;
+    white-space: normal;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .reg-preview__rowno {
+    display: block;
+  }
+}
 .reg-problems {
   margin: 0;
   padding: 0;

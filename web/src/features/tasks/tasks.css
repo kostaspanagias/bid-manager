@@ -122,3 +122,96 @@
 .handoff-state .ui-btn {
   margin-top: var(--sp-1);
 }
+
+.handoff-cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+@media (max-width: 720px) {
+  .handoff-table {
+    display: none;
+  }
+  .handoff-cards {
+    display: flex;
+  }
+}
+.handoff-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--tone-solid, var(--c-border-strong));
+  border-radius: var(--radius-md);
+}
+.handoff-card.is-off {
+  color: var(--c-text-faint);
+}
+.handoff-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: var(--control-h-sm);
+}
+.handoff-card .handoff-route {
+  white-space: normal;
+  flex-wrap: wrap;
+}
+
+.task-cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+@media (max-width: 720px) {
+  .tasks-table {
+    display: none;
+  }
+  .task-cards {
+    display: flex;
+  }
+}
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--tone-solid, var(--c-border-strong));
+  border-radius: var(--radius-md);
+}
+.task-card.is-off {
+  color: var(--c-text-muted);
+}
+.task-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-weight: var(--weight-medium);
+}
+.task-card__date {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.task-card__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+.task-card__controls .tasks-inline.ui-input {
+  max-width: none;
+  min-width: 0;
+  width: 100%;
+  height: var(--control-h);
+}

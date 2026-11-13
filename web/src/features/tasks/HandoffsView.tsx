@@ -46,6 +46,62 @@ export function HandoffsView({ data, tenderId, canWrite, loading, onEdit }: Prop
     } else handoff.mutate({ id: x.id, action: 'receive' });
   };
 
+  const stateCell = (x: TaskView) => {
+        const b = handoffBadge(x);
+        const h = x.handoff;
+        return (
+          <div className="handoff-state">
+            <Badge tone={b.tone} dot>
+              {t(`handoffs.state.${b.key}`)}
+            </Badge>
+            {h?.state === 'received' && x.received_at && (
+              <span className="tasks-desc">
+                {t(h.received_by_override ? 'handoffs.receivedByOverride' : 'handoffs.receivedBy', { name: nameOf(x.received_by) || '—', at: formatDateTime(x.received_at) })}
+              </span>
+            )}
+            {h?.state === 'delivered' && h.delivered_at && (
+              <span className="tasks-desc">{t('handoffs.deliveredBy', { name: nameOf(h.delivered_by) || '—', at: formatDateTime(h.delivered_at) })}</span>
+            )}
+            {(h?.receive_note || (h?.state === 'delivered' && h.delivery_note)) && <span className="tasks-desc">«{h.receive_note ?? h.delivery_note}»</span>}
+            {canWrite && h?.can_receive && (h.state === 'delivered' || !h.can_deliver) && (
+              <Button size="sm" variant="primary" icon="check" loading={handoff.isPending && handoff.variables?.id === x.id} onClick={() => receive(x)}>
+                {t('handoffs.receive')}
+              </Button>
+            )}
+            {canWrite && h?.can_deliver && (
+              <Button size="sm" icon="upload" loading={handoff.isPending && handoff.variables?.id === x.id} onClick={() => handoff.mutate({ id: x.id, action: 'deliver' })}>
+                {t('handoffs.deliver')}
+              </Button>
+            )}
+          </div>
+        );
+      };
+  const menuCell = (x: TaskView) => {
+        const h = x.handoff;
+        if (!canWrite || !h) return null;
+        const live = x.status === 'open' || x.status === 'in_progress';
+        return (
+          <>
+            <Menu
+              label={`${t('common:actions.more')}: ${x.title}`}
+              items={[
+                { label: t('common:actions.edit'), icon: 'edit', onSelect: () => onEdit({ mode: 'edit', task: x }) },
+                h.can_receive && h.can_deliver && h.state === 'pending' && { label: t('handoffs.receiveDirect'), icon: 'check', onSelect: () => receive(x) },
+                live && h.state === 'delivered' && (data.me.can_manage || data.me.role_keys.includes(x.handoff_from_role ?? '')) && {
+                  label: t('handoffs.undoDeliver'),
+                  icon: 'history',
+                  onSelect: () => handoff.mutate({ id: x.id, action: 'undo-deliver' }),
+                },
+                h.can_undo_receive && { label: t('handoffs.undoReceive'), icon: 'history', onSelect: () => handoff.mutate({ id: x.id, action: 'undo-receive' }) },
+                data.me.can_manage && live && { label: t('handoffs.markNa'), icon: 'block', separatorBefore: true, onSelect: () => update.mutate({ id: x.id, body: { status: 'na' } }) },
+                data.me.can_manage && (x.status === 'na' || x.status === 'cancelled') && { label: t('handoffs.reopen'), icon: 'history', onSelect: () => update.mutate({ id: x.id, body: { status: 'open' } }) },
+                !x.from_template && h.state !== 'received' && { label: t('common:actions.delete'), icon: 'trash', danger: true, separatorBefore: true, onSelect: () => setRemoving(x) },
+              ]}
+            />
+          </>
+        );
+      };
+
   const columns: Column<TaskView>[] = [
     {
       key: 'route',
@@ -77,72 +133,8 @@ export function HandoffsView({ data, tenderId, canWrite, loading, onEdit }: Prop
       mono: true,
       render: (x) => <DateText value={x.due_date} withWeekday />,
     },
-    {
-      key: 'state',
-      header: t('common:labels.status'),
-      wrap: true,
-      render: (x) => {
-        const b = handoffBadge(x);
-        const h = x.handoff;
-        return (
-          <div className="handoff-state">
-            <Badge tone={b.tone} dot>
-              {t(`handoffs.state.${b.key}`)}
-            </Badge>
-            {h?.state === 'received' && x.received_at && (
-              <span className="tasks-desc">
-                {t(h.received_by_override ? 'handoffs.receivedByOverride' : 'handoffs.receivedBy', { name: nameOf(x.received_by) || '—', at: formatDateTime(x.received_at) })}
-              </span>
-            )}
-            {h?.state === 'delivered' && h.delivered_at && (
-              <span className="tasks-desc">{t('handoffs.deliveredBy', { name: nameOf(h.delivered_by) || '—', at: formatDateTime(h.delivered_at) })}</span>
-            )}
-            {(h?.receive_note || (h?.state === 'delivered' && h.delivery_note)) && <span className="tasks-desc">«{h.receive_note ?? h.delivery_note}»</span>}
-            {canWrite && h?.can_receive && (h.state === 'delivered' || !h.can_deliver) && (
-              <Button size="sm" variant="primary" icon="check" loading={handoff.isPending && handoff.variables?.id === x.id} onClick={() => receive(x)}>
-                {t('handoffs.receive')}
-              </Button>
-            )}
-            {canWrite && h?.can_deliver && (
-              <Button size="sm" icon="upload" loading={handoff.isPending && handoff.variables?.id === x.id} onClick={() => handoff.mutate({ id: x.id, action: 'deliver' })}>
-                {t('handoffs.deliver')}
-              </Button>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'actions',
-      header: t('common:labels.actions'),
-      srOnlyHeader: true,
-      align: 'right',
-      render: (x) => {
-        const h = x.handoff;
-        if (!canWrite || !h) return null;
-        const live = x.status === 'open' || x.status === 'in_progress';
-        return (
-          <CellActions>
-            <Menu
-              label={`${t('common:actions.more')}: ${x.title}`}
-              items={[
-                { label: t('common:actions.edit'), icon: 'edit', onSelect: () => onEdit({ mode: 'edit', task: x }) },
-                h.can_receive && h.can_deliver && h.state === 'pending' && { label: t('handoffs.receiveDirect'), icon: 'check', onSelect: () => receive(x) },
-                live && h.state === 'delivered' && (data.me.can_manage || data.me.role_keys.includes(x.handoff_from_role ?? '')) && {
-                  label: t('handoffs.undoDeliver'),
-                  icon: 'history',
-                  onSelect: () => handoff.mutate({ id: x.id, action: 'undo-deliver' }),
-                },
-                h.can_undo_receive && { label: t('handoffs.undoReceive'), icon: 'history', onSelect: () => handoff.mutate({ id: x.id, action: 'undo-receive' }) },
-                data.me.can_manage && live && { label: t('handoffs.markNa'), icon: 'block', separatorBefore: true, onSelect: () => update.mutate({ id: x.id, body: { status: 'na' } }) },
-                data.me.can_manage && (x.status === 'na' || x.status === 'cancelled') && { label: t('handoffs.reopen'), icon: 'history', onSelect: () => update.mutate({ id: x.id, body: { status: 'open' } }) },
-                !x.from_template && h.state !== 'received' && { label: t('common:actions.delete'), icon: 'trash', danger: true, separatorBefore: true, onSelect: () => setRemoving(x) },
-              ]}
-            />
-          </CellActions>
-        );
-      },
-    },
+    { key: 'state', header: t('common:labels.status'), wrap: true, render: stateCell },
+    { key: 'actions', header: t('common:labels.actions'), srOnlyHeader: true, align: 'right', render: (x) => <CellActions>{menuCell(x)}</CellActions> },
   ];
 
   return (
@@ -160,6 +152,7 @@ export function HandoffsView({ data, tenderId, canWrite, loading, onEdit }: Prop
           </Button>
         )}
       </div>
+      <div className="handoff-table">
       <Table
         caption={t('views.handoffs')}
         columns={columns}
@@ -169,6 +162,32 @@ export function HandoffsView({ data, tenderId, canWrite, loading, onEdit }: Prop
         rowClassName={(x) => (x.status === 'na' || x.status === 'cancelled' ? 'is-muted' : undefined)}
         empty={<EmptyState compact icon="inbox" title={t('handoffs.empty')} description={t('handoffs.emptyHint')} />}
       />
+      </div>
+      {/* Phones: one card per handoff, so the confirm button is never off-screen */}
+      <ul className="handoff-cards" aria-label={t('views.handoffs')}>
+        {rows.length === 0 && (
+          <li>
+            <EmptyState compact icon="inbox" title={t('handoffs.empty')} description={t('handoffs.emptyHint')} />
+          </li>
+        )}
+        {rows.map((x) => (
+          <li key={x.id} className={`handoff-card${x.overdue ? ' ui-tone-red' : x.handoff?.state === 'received' ? ' ui-tone-green' : ''}${x.status === 'na' || x.status === 'cancelled' ? ' is-off' : ''}`}>
+            <div className="handoff-card__head">
+              <span className="handoff-route">
+                <strong>{roleName(data.roles, x.handoff_from_role)}</strong>
+                <span aria-hidden="true">→</span>
+                <strong>{roleName(data.roles, x.handoff_to_role)}</strong>
+              </span>
+              {menuCell(x)}
+            </div>
+            <div>{x.title}</div>
+            <div className="u-mono u-muted">
+              <DateText value={x.due_date} withWeekday />
+            </div>
+            {stateCell(x)}
+          </li>
+        ))}
+      </ul>
 
       <Modal
         open={receiving !== null}

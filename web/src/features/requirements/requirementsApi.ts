@@ -79,7 +79,16 @@ export const registerKeys = {
 
 const base = (tenderId: ID) => `/tenders/${tenderId}/requirements`;
 
-export const fetchRegister = (tenderId: ID) => api.get<RegisterResponse>(base(tenderId));
+const NO_COVERAGE: Coverage = { total: 0, covered: 0, ratio: null };
+/** Fills in defaults, so a partial answer (e.g. the `{ items: [] }` of the screenshot mock) still renders. */
+export const fetchRegister = (tenderId: ID): Promise<RegisterResponse> =>
+  api.get<Partial<RegisterResponse>>(base(tenderId)).then((r) => ({
+    items: r.items ?? [],
+    total: r.total ?? r.items?.length ?? 0,
+    coverage: r.coverage ?? { exclusion: NO_COVERAGE, scored: NO_COVERAGE, formal: NO_COVERAGE, all: NO_COVERAGE, exclusionWithoutEvidence: 0, open: 0, deviations: 0 },
+    nextCode: r.nextCode ?? 'ΥΠ-001',
+    owners: { roles: r.owners?.roles ?? [], users: r.owners?.users ?? [] },
+  }));
 export const fetchCoverage = (tenderId: ID) => api.get<RegisterCoverage>(`${base(tenderId)}/coverage`);
 export const createRequirement = (tenderId: ID, body: RequirementBody) => api.post<RegisterRow>(base(tenderId), body);
 export const updateRequirement = (tenderId: ID, id: ID, body: RequirementBody) => api.patch<RegisterRow>(`${base(tenderId)}/${id}`, body);

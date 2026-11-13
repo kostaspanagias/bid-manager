@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage } from '@/api/client';
 import { TENDER_STATUSES, type TenderStatus } from '@/api/types';
 import { useAuth } from '@/features/auth/AuthProvider';
@@ -133,16 +133,44 @@ export function TenderListPage() {
               <Select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} options={statusOptions} />
             </Field>
           </FilterBar>
-          <Table
-            caption={t('title')}
-            columns={columns}
-            rows={rows}
-            loading={query.isPending}
-            onRowClick={(r) => navigate(`/tenders/${r.id}`)}
-            rowTone={(r) => (!isActive(r) ? undefined : r.tMinus <= 2 ? 'red' : r.compressed_mode ? 'orange' : undefined)}
-            rowClassName={(r) => (isActive(r) ? undefined : 'is-muted')}
-            emptyTitle={t('common:state.emptyFiltered')}
-          />
+          <div className="tender-list__table">
+            <Table
+              caption={t('title')}
+              columns={columns}
+              rows={rows}
+              loading={query.isPending}
+              onRowClick={(r) => navigate(`/tenders/${r.id}`)}
+              rowTone={(r) => (!isActive(r) ? undefined : r.tMinus <= 2 ? 'red' : r.compressed_mode ? 'orange' : undefined)}
+              rowClassName={(r) => (isActive(r) ? undefined : 'is-muted')}
+              emptyTitle={t('common:state.emptyFiltered')}
+            />
+          </div>
+          {/* phones: the same rows as cards, so T and T−n are visible without scrolling sideways */}
+          <ul className="tender-cards" aria-label={t('title')}>
+            {rows.map((r) => (
+              <li key={r.id} className={isActive(r) ? undefined : 'is-muted'}>
+                <Link to={`/tenders/${r.id}`} className="tender-cards__link">
+                  <strong>{r.title}</strong>
+                  <span className="u-muted">{r.authority}</span>
+                  <span className="tender-cards__row">
+                    <StatusBadge kind="tender_status" value={r.status} dot />
+                    {r.compressed_mode && isActive(r) && <Badge tone="orange">{t('list.compressed')}</Badge>}
+                  </span>
+                  <span className="tender-cards__row">
+                    <DateText value={r.submission_deadline_at} withWeekday withTime className="u-mono" />
+                    {isActive(r) && <TMinus n={r.tMinus} />}
+                  </span>
+                  {r.next_gate && (
+                    <span className="tender-cards__row u-muted">
+                      {t('list.columns.nextGate')}: <Badge tone="neutral">{r.next_gate.key}</Badge>
+                      <DateText value={r.next_gate.due_date} withWeekday className="u-mono" />
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ))}
+            {!query.isPending && rows.length === 0 && <li className="tender-cards__empty u-muted">{t('common:state.emptyFiltered')}</li>}
+          </ul>
         </>
       )}
     </>

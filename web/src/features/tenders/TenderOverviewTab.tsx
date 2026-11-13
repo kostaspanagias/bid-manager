@@ -79,134 +79,137 @@ export function TenderOverviewTab() {
       />
 
       <div className="overview-grid">
-        <Card title={t('overview.deadlines')} className="overview-grid__deadlines">
-          <dl className="facts">
-            <Fact label={t('form.t0')}>{tender.t0_published_at && <DateText value={tender.t0_published_at} withWeekday />}</Fact>
-            <Fact label={t('form.questions')}>
-              {tender.questions_deadline_at && (
-                <>
-                  <DateText value={tender.questions_deadline_at} withWeekday withTime />
-                  {questionsIn !== null && questionsIn >= 0 && <span className="u-muted facts__note">{t('overview.inWorkingDays', { count: questionsIn })}</span>}
-                  {questionsIn !== null && questionsIn < 0 && <span className="u-muted facts__note">{t('overview.passed')}</span>}
-                </>
-              )}
-            </Fact>
-            <Fact label={t('form.submission')} wide>
-              <strong>
-                <DateText value={tender.submission_deadline_at} withWeekday withTime />
-              </strong>{' '}
-              {isActive && <TMinus n={tMinus} />}
-            </Fact>
-          </dl>
-          <div className="overview-grid__links">
-            <LinkButton size="sm" to="../schedule" icon="calendar">
-              {t('overview.openSchedule')}
-            </LinkButton>
-          </div>
-        </Card>
-
-        <Card title={t('overview.nextGate')} className="overview-grid__gate">
-          {nextGate ? (
-            <div className="next-gate">
-              <Badge tone="info">{nextGate.key}</Badge>
-              <div className="next-gate__body">
-                <strong>{nextGate.name}</strong>
-                <span>
-                  <DateText value={nextGate.due_date} withWeekday /> <TMinus n={nextGate.tMinus} tone="neutral" />
-                </span>
-              </div>
-              <LinkButton size="sm" to="../gates">
-                {t('overview.openGates')}
+        <div className="overview-grid__col">
+          <Card title={t('overview.deadlines')} className="overview-grid__deadlines">
+            <dl className="facts">
+              <Fact label={t('form.t0')}>{tender.t0_published_at && <DateText value={tender.t0_published_at} withWeekday />}</Fact>
+              <Fact label={t('form.questions')}>
+                {tender.questions_deadline_at && (
+                  <>
+                    <DateText value={tender.questions_deadline_at} withWeekday withTime />
+                    {questionsIn !== null && questionsIn >= 0 && <span className="u-muted facts__note">{t('overview.inWorkingDays', { count: questionsIn })}</span>}
+                    {questionsIn !== null && questionsIn < 0 && <span className="u-muted facts__note">{t('overview.passed')}</span>}
+                  </>
+                )}
+              </Fact>
+              <Fact label={t('form.submission')} wide>
+                <strong>
+                  <DateText value={tender.submission_deadline_at} withWeekday withTime />
+                </strong>{' '}
+                {isActive && <TMinus n={tMinus} />}
+              </Fact>
+            </dl>
+            <div className="overview-grid__links">
+              <LinkButton size="sm" to="../schedule" icon="calendar">
+                {t('overview.openSchedule')}
               </LinkButton>
             </div>
-          ) : (
-            <p className="u-muted">{isActive ? t('overview.noNextGate') : t('overview.closedNoGate')}</p>
-          )}
-        </Card>
+          </Card>
 
-        <Card title={t('overview.facts')} className="overview-grid__facts">
-          <dl className="facts">
-            <Fact label={t('form.authority')} wide>
-              {tender.authority}
-            </Fact>
-            <Fact label={t('form.adam')}>{tender.adam && <span className="u-mono">{tender.adam}</span>}</Fact>
-            <Fact label={t('form.esidis')}>{tender.esidis_no && <span className="u-mono">{tender.esidis_no}</span>}</Fact>
-            <Fact label={t('form.cpv')} wide>
-              {tender.cpv.length > 0 && <span className="u-mono">{tender.cpv.join(' · ')}</span>}
-            </Fact>
-            <Fact label={t('form.budgetNet')}>{money(tender.budget_net)}</Fact>
-            <Fact label={t('form.budgetGross')}>{money(tender.budget_gross)}</Fact>
-            <Fact label={t('form.template')}>{templateLabel}</Fact>
-            <Fact label={t('overview.flags')}>
-              <span className="u-row">
-                <Badge tone={tender.has_demo ? 'info' : 'neutral'}>{tender.has_demo ? t('overview.demoYes') : t('overview.demoNo')}</Badge>
-                <Badge tone={tender.has_partners ? 'info' : 'neutral'}>{tender.has_partners ? t('overview.partnersYes') : t('overview.partnersNo')}</Badge>
-              </span>
-            </Fact>
-            {tender.notes && (
-              <Fact label={t('form.notes')} wide>
-                <span className="facts__notes">{tender.notes}</span>
+          <Card title={t('overview.facts')} className="overview-grid__facts">
+            <dl className="facts">
+              <Fact label={t('form.authority')} wide>
+                {tender.authority}
               </Fact>
-            )}
-          </dl>
-        </Card>
-
-        <Card title={t('overview.guarantee')} tone={guaranteeShort ? 'orange' : undefined} className="overview-grid__guarantee">
-          <dl className="facts">
-            <Fact label={t('form.guaranteeAmount')}>{money(tender.guarantee_amount)}</Fact>
-            <Fact label={t('form.guaranteeValidUntil')}>
-              {tender.guarantee_valid_until && <DateText value={tender.guarantee_valid_until} className={guaranteeShort ? 'u-text-orange' : undefined} />}
-            </Fact>
-            <Fact label={t('form.offerValidity')}>{tender.offer_validity_days != null && t('overview.days', { count: tender.offer_validity_days })}</Fact>
-            <Fact label={t('form.guaranteeMargin')}>{t('overview.days', { count: tender.guarantee_margin_days })}</Fact>
-            <Fact label={t('overview.requiredUntil')} wide>
-              {requiredUntil && (
-                <>
-                  <DateText value={requiredUntil} /> <span className="u-muted facts__note">{t('overview.requiredUntilHint')}</span>
-                </>
-              )}
-            </Fact>
-          </dl>
-        </Card>
-
-        <Card title={t('overview.lots', { count: lots.length })} flush={lots.length > 0} className="overview-grid__lots">
-          {lots.length === 0 ? (
-            <p className="u-muted">{t('overview.noLots')}</p>
-          ) : (
-            <ul className="lot-list">
-              {lots.map((lot, i) => (
-                <li key={i}>
-                  <span className="lot-list__no u-mono">{lot.no ?? i + 1}</span>
-                  <span className="lot-list__title">{lot.title}</span>
-                  <span className="lot-list__budget u-mono">{money(lot.budget_net) ?? '—'}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card title={t('overview.status')} className="overview-grid__status">
-          <div className="u-stack u-stack--sm">
-            <div className="u-row">
-              <StatusBadge kind="tender_status" value={tender.status} dot />
-              {tender.closed_at && (
-                <span className="u-muted">
-                  {t('overview.closedAt')} <DateText value={tender.closed_at} withTime />
+              <Fact label={t('form.adam')}>{tender.adam && <span className="u-mono">{tender.adam}</span>}</Fact>
+              <Fact label={t('form.esidis')}>{tender.esidis_no && <span className="u-mono">{tender.esidis_no}</span>}</Fact>
+              <Fact label={t('form.cpv')} wide>
+                {tender.cpv.length > 0 && <span className="u-mono">{tender.cpv.join(' · ')}</span>}
+              </Fact>
+              <Fact label={t('form.budgetNet')}>{money(tender.budget_net)}</Fact>
+              <Fact label={t('form.budgetGross')}>{money(tender.budget_gross)}</Fact>
+              <Fact label={t('form.template')}>{templateLabel}</Fact>
+              <Fact label={t('overview.flags')}>
+                <span className="u-row">
+                  <Badge tone={tender.has_demo ? 'info' : 'neutral'}>{tender.has_demo ? t('overview.demoYes') : t('overview.demoNo')}</Badge>
+                  <Badge tone={tender.has_partners ? 'info' : 'neutral'}>{tender.has_partners ? t('overview.partnersYes') : t('overview.partnersNo')}</Badge>
                 </span>
+              </Fact>
+              {tender.notes && (
+                <Fact label={t('form.notes')} wide>
+                  <span className="facts__notes">{tender.notes}</span>
+                </Fact>
+              )}
+            </dl>
+          </Card>
+
+          <Card title={t('overview.status')} className="overview-grid__status">
+            <div className="u-stack u-stack--sm">
+              <div className="u-row">
+                <StatusBadge kind="tender_status" value={tender.status} dot />
+                {tender.closed_at && (
+                  <span className="u-muted">
+                    {t('overview.closedAt')} <DateText value={tender.closed_at} withTime />
+                  </span>
+                )}
+              </div>
+              <p className="u-muted">{t(`overview.statusHelp.${tender.status}`)}</p>
+              {transitions.length > 0 && (
+                <div className="u-row">
+                  {transitions.map((next) => (
+                    <Button key={next} size="sm" variant={next === 'cancelled' ? 'danger' : next === 'submitted' ? 'primary' : 'secondary'} onClick={() => setTarget(next)}>
+                      {t(`overview.statusAction.${tender.status}.${next}`)}
+                    </Button>
+                  ))}
+                </div>
               )}
             </div>
-            <p className="u-muted">{t(`overview.statusHelp.${tender.status}`)}</p>
-            {transitions.length > 0 && (
-              <div className="u-row">
-                {transitions.map((next) => (
-                  <Button key={next} size="sm" variant={next === 'cancelled' ? 'danger' : next === 'submitted' ? 'primary' : 'secondary'} onClick={() => setTarget(next)}>
-                    {t(`overview.statusAction.${tender.status}.${next}`)}
-                  </Button>
-                ))}
+          </Card>
+        </div>
+        <div className="overview-grid__col">
+          <Card title={t('overview.nextGate')} className="overview-grid__gate">
+            {nextGate ? (
+              <div className="next-gate">
+                <Badge tone="info">{nextGate.key}</Badge>
+                <div className="next-gate__body">
+                  <strong>{nextGate.name}</strong>
+                  <span>
+                    <DateText value={nextGate.due_date} withWeekday /> <TMinus n={nextGate.tMinus} tone="neutral" />
+                  </span>
+                </div>
+                <LinkButton size="sm" to="../gates">
+                  {t('overview.openGates')}
+                </LinkButton>
               </div>
+            ) : (
+              <p className="u-muted">{isActive ? t('overview.noNextGate') : t('overview.closedNoGate')}</p>
             )}
-          </div>
-        </Card>
+          </Card>
+
+          <Card title={t('overview.guarantee')} tone={guaranteeShort ? 'orange' : undefined} className="overview-grid__guarantee">
+            <dl className="facts">
+              <Fact label={t('form.guaranteeAmount')}>{money(tender.guarantee_amount)}</Fact>
+              <Fact label={t('form.guaranteeValidUntil')}>
+                {tender.guarantee_valid_until && <DateText value={tender.guarantee_valid_until} className={guaranteeShort ? 'u-text-orange' : undefined} />}
+              </Fact>
+              <Fact label={t('form.offerValidity')}>{tender.offer_validity_days != null && t('overview.days', { count: tender.offer_validity_days })}</Fact>
+              <Fact label={t('form.guaranteeMargin')}>{t('overview.days', { count: tender.guarantee_margin_days })}</Fact>
+              <Fact label={t('overview.requiredUntil')} wide>
+                {requiredUntil && (
+                  <>
+                    <DateText value={requiredUntil} /> <span className="u-muted facts__note">{t('overview.requiredUntilHint')}</span>
+                  </>
+                )}
+              </Fact>
+            </dl>
+          </Card>
+
+          <Card title={t('overview.lots', { count: lots.length })} flush={lots.length > 0} className="overview-grid__lots">
+            {lots.length === 0 ? (
+              <p className="u-muted">{t('overview.noLots')}</p>
+            ) : (
+              <ul className="lot-list">
+                {lots.map((lot, i) => (
+                  <li key={i}>
+                    <span className="lot-list__no u-mono">{lot.no ?? i + 1}</span>
+                    <span className="lot-list__title">{lot.title}</span>
+                    <span className="lot-list__budget u-mono">{money(lot.budget_net) ?? '—'}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
       </div>
 
       <ConfirmDialog

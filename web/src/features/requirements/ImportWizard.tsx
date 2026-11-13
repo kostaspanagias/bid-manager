@@ -152,6 +152,9 @@ export function ImportWizard({ tenderId, onClose, onImported }: Props) {
           <span className="reg-preview__text" title={r.values.text}>
             {r.values.text ?? <span className="u-faint">—</span>}
           </span>
+          <span className="reg-preview__rowno">
+            {t('import.row')} {r.row}
+          </span>
           {r.errors.length + r.warnings.length + r.kept.length + r.changed.length > 0 && (
             <ul className="reg-problems">
               {r.errors.map((p, i) => (

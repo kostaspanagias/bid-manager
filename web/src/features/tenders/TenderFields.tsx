@@ -319,7 +319,7 @@ export function FlagFields({ form, set, disabled }: Pick<SectionProps, 'form' | 
 export function NotesField({ form, set }: Pick<SectionProps, 'form' | 'set'>) {
   const { t } = useTranslation('tenders');
   return (
-    <Field label={t('form.notes')}>
+    <Field label={t('form.notes')} hideLabel>
       <Textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={3} maxLength={10000} />
     </Field>
   );
