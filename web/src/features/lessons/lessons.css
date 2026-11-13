@@ -1,0 +1,48 @@
+/* Lessons tab */
+.lessons-filter {
+  margin-bottom: var(--sp-3);
+}
+.lessons-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lessons-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--c-border);
+}
+.lessons-item:first-child {
+  border-top: 0;
+}
+.lessons-item__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.lessons-item__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.lessons-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+  margin-top: var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+}
+.lessons-item__actions {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+@media (max-width: 560px) {
+  .lessons-item {
+    padding-left: var(--sp-3);
+    padding-right: var(--sp-3);
+  }
+}

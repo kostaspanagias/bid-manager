@@ -78,11 +78,11 @@ function Row({ item, showKey = true, meta, children, editable, severity, canUp, 
       </div>
       {editable ? (
         <div className="tpl-row__actions">
-          <Button size="sm" variant="ghost" icon="chevronDown" iconOnly disabled={!canDown || busy} onClick={() => onMove(1)}>
-            {t('row.down', { name: item.name })}
-          </Button>
           <Button size="sm" variant="ghost" icon="chevronDown" iconOnly className="tpl-up" disabled={!canUp || busy} onClick={() => onMove(-1)}>
             {t('row.up', { name: item.name })}
+          </Button>
+          <Button size="sm" variant="ghost" icon="chevronDown" iconOnly disabled={!canDown || busy} onClick={() => onMove(1)}>
+            {t('row.down', { name: item.name })}
           </Button>
           <Button size="sm" variant="ghost" icon="edit" iconOnly onClick={onEdit}>
             {t('row.edit', { name: item.name })}

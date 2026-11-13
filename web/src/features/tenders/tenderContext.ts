@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ID, Tender } from '@/api/types';
+import type { NextGate, TenderWarning } from './tenderApi';
 import type { DateString } from '@/lib/dates';
 
 export interface TenderContextValue {
@@ -15,6 +16,12 @@ export interface TenderContextValue {
   canWrite: boolean;
   /** The current user may see financial-folder files (R18). UI hint — server enforces. */
   canSeeFinancial: boolean;
+  /** Admin / bid manager: may edit basic fields, team, deadline, status and milestone dates. UI hint — server enforces. */
+  canManage: boolean;
+  /** Server-computed warnings (R7 late G0 target, R8 compressed / guarantee, R15 expired documents, R16 guarantee validity) */
+  warnings: TenderWarning[];
+  /** The next gate waiting for a decision, if any */
+  nextGate: NextGate | null;
   /** Re-fetch the tender record (after changing deadline, status, flags…) */
   refetch: () => Promise<unknown>;
 }

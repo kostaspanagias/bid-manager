@@ -1,0 +1,35 @@
+/* Account page */
+.account-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+  max-width: 920px;
+}
+@media (min-width: 900px) {
+  .account-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  }
+}
+.account-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+}
+.account-facts dt {
+  color: var(--c-text-muted);
+}
+.account-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.account-hint {
+  margin: var(--sp-3) 0 0;
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+}
+form .account-hint {
+  margin: 0;
+}

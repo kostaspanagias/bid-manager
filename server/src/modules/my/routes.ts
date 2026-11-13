@@ -30,6 +30,8 @@ export interface MyItem {
   /** how the item reached the user: assigned by name, or through a tender role they hold */
   via: 'user' | 'role';
   role_key: string | null;
+  /** display name of role_key in that tender */
+  role_name: string | null;
   /** kind-specific extras (handoff roles, watch state, gate key…) */
   info: Record<string, unknown>;
 }
@@ -56,13 +58,16 @@ export async function collectMyWork(ctx: Pick<Ctx, 'user' | 'db'>, today = today
   const tenderIds = tenders.map((t) => t.id as string);
   const titleOf = new Map(tenders.map((t) => [t.id as string, String(t.title)]));
 
-  const [memberships, tasks, watchItems, gates, milestones] = await Promise.all([
+  const [memberships, tasks, watchItems, gates, milestones, tenderRoles] = await Promise.all([
     db.list<{ tender_id: string; tender_role_key: string | null }>('tender_member', { user_id: user.id, tender_id: tenderIds }),
     db.list('task', { tender_id: tenderIds, status: [...OPEN_TASK_STATUSES] }, { orderBy: 'due_date nulls last, sort' }),
     db.list('watch_item', { tender_id: tenderIds, arrived_at: null }, { orderBy: 'sort' }),
     db.list('gate', { tender_id: tenderIds, approver_user_id: user.id, decision: 'pending' }),
     db.list('milestone', { tender_id: tenderIds }),
+    db.list<{ tender_id: string; key: string; name: string }>('tender_role', { tender_id: tenderIds }),
   ]);
+  const roleNames = new Map(tenderRoles.map((r) => [`${r.tender_id}:${r.key}`, r.name]));
+  const roleNameOf = (tenderId: string, key: unknown): string | null => (typeof key === 'string' ? (roleNames.get(`${tenderId}:${key}`) ?? key) : null);
   const rolesIn = new Map<string, Set<string>>();
   for (const m of memberships) {
     if (!m.tender_role_key) continue;
@@ -80,13 +85,18 @@ export async function collectMyWork(ctx: Pick<Ctx, 'user' | 'db'>, today = today
   }
 
   const items: MyItem[] = [];
-  const push = (item: Omit<MyItem, 'bucket' | 'tender_title'> & { bucket?: MyBucket }) =>
-    items.push({ ...item, tender_title: titleOf.get(item.tender_id) ?? '', bucket: item.bucket ?? bucketOf(item.date, today, horizon) });
+  const push = (item: Omit<MyItem, 'bucket' | 'tender_title' | 'role_name'> & { bucket?: MyBucket }) =>
+    items.push({
+      ...item,
+      role_name: roleNameOf(item.tender_id, item.role_key),
+      tender_title: titleOf.get(item.tender_id) ?? '',
+      bucket: item.bucket ?? bucketOf(item.date, today, horizon),
+    });
 
   for (const t of tasks) {
     const base = { id: t.id as string, tender_id: t.tender_id as string, tab: 'tasks' as const, title: String(t.title), date: (t.due_date as string | null) ?? null, status: String(t.status) };
     if (t.section === 'handoff') {
-      const info = { from_role: t.handoff_from_role, to_role: t.handoff_to_role, delivered: !!t.payload?.delivered_at, delivered_at: t.payload?.delivered_at ?? null };
+      const info = { from_role: t.handoff_from_role, to_role: t.handoff_to_role, from_role_name: roleNameOf(t.tender_id, t.handoff_from_role), to_role_name: roleNameOf(t.tender_id, t.handoff_to_role), delivered: !!t.payload?.delivered_at, delivered_at: t.payload?.delivered_at ?? null };
       // Waiting for my receipt (I hold the "to" role) …
       if (holds(t.tender_id, t.handoff_to_role)) {
         push({ ...base, kind: 'handoff_receive', via: 'role', role_key: t.handoff_to_role, info });

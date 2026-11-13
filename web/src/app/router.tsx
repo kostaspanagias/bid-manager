@@ -3,6 +3,7 @@
  * this file does not need to change.
  */
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
+import { AccountPage } from '@/features/account/AccountPage';
 import { AuditPage } from '@/features/admin/AuditPage';
 import { HolidaysPage } from '@/features/admin/HolidaysPage';
 import { UsersPage } from '@/features/admin/UsersPage';
@@ -82,6 +83,7 @@ export const router = createBrowserRouter([
             ],
           },
           { path: '/my', element: <MyWorkPage /> },
+          { path: '/account', element: <AccountPage /> },
           { path: '/company-documents', element: <CompanyDocumentsPage /> },
           {
             path: '/admin',

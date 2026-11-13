@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '@/features/shared/StatusBadge';
 import { cx } from '@/lib/cx';
-import { formatTMinus } from '@/lib/dates';
+import { formatDate, formatTMinus } from '@/lib/dates';
 import { enumLabel } from '@/lib/enums';
 import { Badge, DateText, ProgressBar, TMinus, tMinusTone } from '@/ui';
 import type { DashboardTender } from './dashboardApi';
@@ -37,6 +37,7 @@ export function TenderCard({ tender }: { tender: DashboardTender }) {
         <span className="dash-tender__tleft">
           {tender.tMinus > 0 ? t('tenders.tminusLeft', { count: tender.tMinus }) : tender.tMinus === 0 ? t('tenders.tminusToday') : t('tenders.tminusPast')}
         </span>
+        <span className="dash-tender__tdate">{formatDate(tender.T).slice(0, 5)}</span>
       </Link>
 
       <div className="dash-tender__main">

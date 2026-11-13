@@ -259,3 +259,6 @@
     padding-right: var(--sp-3);
   }
 }
+.tpl-up svg {
+  transform: rotate(180deg);
+}

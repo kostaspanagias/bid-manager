@@ -1,0 +1,373 @@
+/* Dashboard — tokens only. */
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+.dash > .ui-page-header {
+  margin-bottom: 0;
+}
+.dash__heading {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  margin: 0 0 var(--sp-2);
+}
+
+/* ---- Attention strip ---- */
+.dash-attention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.dash-attention__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dash-attention__link {
+  color: inherit;
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dash-attention__detail {
+  opacity: 0.9;
+}
+
+/* ---- My items ---- */
+.dash-my__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.dash-my__all {
+  font-size: var(--text-sm);
+}
+.dash-my__tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.dash-my__tile {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  color: var(--c-text-muted);
+  text-decoration: none;
+  min-width: 0;
+}
+.dash-my__tile:hover {
+  border-color: var(--c-border-strong);
+}
+.dash-my__tile.is-active {
+  background: var(--tone-bg);
+  border-color: var(--tone-border);
+  color: var(--tone-fg);
+}
+.dash-my__n {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.dash-my__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* ---- Tender rows ---- */
+.dash__tenders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.dash-tender {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 2.2fr) minmax(0, 1.5fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+  padding: var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-left: 4px solid var(--c-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+.dash-tender--red {
+  border-left-color: var(--c-red-solid);
+}
+.dash-tender--orange {
+  border-left-color: var(--c-orange-solid);
+}
+.dash-tender__t {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-2);
+  border-radius: var(--radius-md);
+  background: var(--tone-bg);
+  border: 1px solid var(--tone-border);
+  color: var(--tone-fg);
+  text-decoration: none;
+  text-align: center;
+}
+.dash-tender__tn {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.dash-tender__tleft {
+  font-size: var(--text-xs);
+}
+.dash-tender__tdate {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+.dash-tender__main {
+  min-width: 0;
+}
+.dash-tender__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  margin: 0 0 var(--sp-1);
+  overflow-wrap: anywhere;
+}
+.dash-tender__title a {
+  color: var(--c-text);
+  text-decoration: none;
+}
+.dash-tender__title a:hover {
+  color: var(--c-link);
+  text-decoration: underline;
+}
+.dash-tender__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-1);
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+}
+.dash-tender__deadline {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.dash-tender__badges {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+}
+.dash-tender__badges a {
+  text-decoration: none;
+}
+.dash-tender__col {
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.dash-tender__col p {
+  margin: 0;
+}
+.dash-tender__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  margin: 0 0 var(--sp-1) !important;
+}
+.dash-tender__label a {
+  color: inherit;
+  text-decoration: none;
+}
+.dash-tender__label a:hover {
+  text-decoration: underline;
+}
+.dash-tender__gate {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--c-text);
+  text-decoration: none;
+}
+.dash-tender__gate:hover .dash-tender__gate-head {
+  text-decoration: underline;
+}
+.dash-tender__gate-head {
+  font-size: var(--text-md);
+}
+.dash-tender__gate-when {
+  font-variant-numeric: tabular-nums;
+}
+.dash-tender__gate-who {
+  color: var(--c-text-muted);
+}
+.dash-tender__bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.dash-tender__counts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dash-tender__count {
+  color: var(--c-red-fg);
+  text-decoration: none;
+  font-weight: var(--weight-medium);
+}
+.dash-tender__count:hover {
+  text-decoration: underline;
+}
+.dash-tender__count-n {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 var(--sp-1);
+  border-radius: var(--radius-pill);
+  background: var(--c-red-bg);
+  border: 1px solid var(--c-red-border);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Lower grid: org documents, recently closed, notifications ---- */
+.dash__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--sp-4);
+  align-items: start;
+}
+.dash-docs__summary {
+  margin: 0 0 var(--sp-3);
+}
+.dash-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dash-list__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--c-border);
+  font-size: var(--text-sm);
+}
+.dash-list__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.dash-list__main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dash-list__title {
+  font-weight: var(--weight-medium);
+}
+.dash-list__side {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dash-list__note {
+  font-size: var(--text-xs);
+}
+
+/* ---- Digest preview ---- */
+.dash-mail {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+  min-width: 0;
+}
+.dash-mail__subject {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--c-border);
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+.dash-mail__body {
+  margin: 0;
+  padding: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 55vh;
+  overflow: auto;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+  .dash-tender {
+    grid-template-columns: 92px repeat(3, minmax(0, 1fr));
+  }
+  .dash-tender__main {
+    grid-column: 2 / -1;
+  }
+  .dash-tender__col:nth-of-type(2) {
+    grid-column: 1 / 3;
+  }
+}
+@media (max-width: 640px) {
+  .dash-my__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dash-my__tile {
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .dash-tender {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+  }
+  .dash-tender__main {
+    grid-column: 2;
+  }
+  .dash-tender__col,
+  .dash-tender__col:nth-of-type(2) {
+    grid-column: 1 / -1;
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--c-border);
+  }
+  .dash-tender__tn {
+    font-size: var(--text-xl);
+  }
+  .dash-tender__counts {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--sp-1) var(--sp-3);
+  }
+}

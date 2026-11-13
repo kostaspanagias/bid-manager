@@ -26,9 +26,12 @@ export interface MyItem {
   status: string;
   via: 'user' | 'role';
   role_key: string | null;
+  role_name: string | null;
   info: {
     from_role?: string | null;
     to_role?: string | null;
+    from_role_name?: string | null;
+    to_role_name?: string | null;
     delivered?: boolean;
     state?: string;
     request_overdue?: boolean;

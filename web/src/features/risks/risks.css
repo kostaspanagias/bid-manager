@@ -1,0 +1,55 @@
+.risks-summary {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-sm);
+}
+.risks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--sp-4);
+  align-items: stretch;
+}
+.risk-card {
+  display: flex;
+  flex-direction: column;
+}
+.risk-card > .ui-card__body {
+  flex: 1 1 auto;
+}
+.risk-card.is-closed {
+  opacity: 0.72;
+}
+.risk-card__body {
+  margin: 0;
+}
+.risk-card__body dt {
+  color: var(--c-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.risk-card__body dd {
+  margin: 2px 0 var(--sp-3);
+  overflow-wrap: anywhere;
+}
+.risk-card__body dd:last-child {
+  margin-bottom: 0;
+}
+.risk-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.risk-card__status.ui-input {
+  flex: none;
+  width: auto;
+  min-width: 150px;
+  height: var(--control-h-sm);
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: var(--text-sm);
+}

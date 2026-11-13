@@ -4,12 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
 import { errorMessage, isApiError } from '@/api/client';
 import { ErrorBoundary } from '@/app/ErrorBoundary';
-import { useAuth } from '@/features/auth/AuthProvider';
 import { StatusBadge } from '@/features/shared/StatusBadge';
 import { useWorkingDaysTo } from '@/features/shared/useHolidays';
 import { athensDate, formatDate, formatTime, weekdayShort } from '@/lib/dates';
 import { Badge, Button, EmptyState, Icon, LinkButton, PageSpinner, Tabs, TMinus, type TabItem } from '@/ui';
-import { defaultCanWrite, fetchTender, tenderKeys } from './tenderApi';
+import { fetchTender, tenderKeys } from './tenderApi';
 import { TenderBanners } from './TenderBanners';
 import { TenderContext, type TenderContextValue } from './tenderContext';
 
@@ -37,7 +36,6 @@ const TAB_KEYS = [
 export function TenderLayout() {
   const { t } = useTranslation('tenders');
   const { tenderId = '' } = useParams();
-  const { user } = useAuth();
   const location = useLocation();
 
   const query = useQuery({
@@ -61,11 +59,14 @@ export function TenderLayout() {
       T,
       tMinus: detail.tMinus ?? computedTMinus,
       isActive,
-      canWrite: detail.canWrite ?? (defaultCanWrite(user?.org_role) && isActive),
-      canSeeFinancial: detail.canSeeFinancial ?? Boolean(user && user.org_role !== 'viewer'),
+      canWrite: detail.canWrite,
+      canSeeFinancial: detail.canSeeFinancial,
+      canManage: detail.canManage,
+      warnings: detail.warnings,
+      nextGate: detail.nextGate,
       refetch,
     };
-  }, [detail, tender, T, computedTMinus, user, refetch]);
+  }, [detail, tender, T, computedTMinus, refetch]);
 
   if (query.isPending) return <PageSpinner />;
 

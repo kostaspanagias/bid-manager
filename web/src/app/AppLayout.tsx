@@ -72,6 +72,7 @@ export function AppLayout() {
       }
       items={[
         { label: t('my'), icon: 'inbox', to: '/my' },
+        { label: t('account:menu'), icon: 'user', to: '/account' },
         { label: t('auth:logout'), icon: 'logout', onSelect: doLogout, separatorBefore: true },
       ]}
     />

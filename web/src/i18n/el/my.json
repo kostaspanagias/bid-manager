@@ -1,4 +1,46 @@
 {
   "title": "Τα δικά μου",
-  "subtitle": "Tasks, παραδόσεις και εγκρίσεις που περιμένουν εσάς, σε όλους τους διαγωνισμούς."
+  "subtitle": "Tasks, παραδόσεις και εγκρίσεις που περιμένουν εσάς, σε όλους τους διαγωνισμούς.",
+  "summary": "Σύνοψη",
+  "empty": "Δεν σας περιμένει τίποτα",
+  "emptyHint": "Εδώ εμφανίζονται tasks, παραδόσεις, στοιχεία watchlist και εγκρίσεις πυλών από τους ενεργούς διαγωνισμούς σας.",
+  "toTenders": "Διαγωνισμοί",
+  "noDate": "χωρίς ημερομηνία",
+  "soonHint": "έως {{date}}",
+  "buckets": {
+    "overdue": "Εκπρόθεσμα",
+    "today": "Σήμερα",
+    "soon": "Επόμενες 3 εργάσιμες",
+    "later": "Αργότερα"
+  },
+  "kinds": {
+    "task": "Task",
+    "checklist": "Checklist",
+    "handoff_deliver": "Παράδοση",
+    "handoff_receive": "Παραλαβή",
+    "watch": "Watchlist",
+    "gate": "Πύλη"
+  },
+  "actions": {
+    "done": "Ολοκλήρωση",
+    "receive": "Επιβεβαίωση παραλαβής",
+    "deliver": "Παραδόθηκε",
+    "openGate": "Άνοιγμα πύλης",
+    "openWatch": "Άνοιγμα watchlist"
+  },
+  "notes": {
+    "viaRole": "ρόλος {{role}}",
+    "delivered": "παραδόθηκε από {{from}}, περιμένει την επιβεβαίωσή σας",
+    "notDelivered": "από {{from}}, δεν έχει δηλωθεί παράδοση",
+    "toDeliver": "προς {{to}}",
+    "gateRequested": "ζητήθηκε η έγκρισή σας",
+    "gatePending": "είστε approver",
+    "watch": {
+      "request_overdue": "έπρεπε να έχει ζητηθεί",
+      "not_requested": "τελευταία ημέρα αίτησης",
+      "requested": "αναμένεται",
+      "late": "καθυστερεί",
+      "arrived": "παραλήφθηκε"
+    }
+  }
 }
