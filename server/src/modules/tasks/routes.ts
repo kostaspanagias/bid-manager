@@ -301,6 +301,17 @@ router.patch('/:id', async (req, res) => {
     if (body.owner_role_key && body.owner_user_id === undefined) patch.owner_user_id = null;
   }
 
+  // A handoff's roles, milestone and date decide who may deliver / receive it and whether a gate waits for it
+  // (`handoffs_received`): only the bid manager or an admin re-wires them.
+  if (task.section === 'handoff' && !isManager(req.ctx)) {
+    const rewires =
+      (body.handoff_from_role !== undefined && body.handoff_from_role !== task.handoff_from_role) ||
+      (body.handoff_to_role !== undefined && body.handoff_to_role !== task.handoff_to_role) ||
+      (body.milestone_id !== undefined && body.milestone_id !== (task.milestone_id ?? null)) ||
+      (body.due_date !== undefined && body.due_date !== (task.due_date ?? null));
+    if (rewires) throw forbidden('Only the bid manager can change the roles, milestone or date of a handoff', 'handoff_manager_only');
+  }
+
   if (body.milestone_id !== undefined) {
     if (body.milestone_id) await assertMilestone(db, tenderId, body.milestone_id);
     patch.milestone_id = body.milestone_id;

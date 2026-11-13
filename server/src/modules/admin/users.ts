@@ -104,7 +104,7 @@ router.post('/:id/reset-password', async (req, res) => {
   const resetUrl = `${config.appUrl}/reset/${encodeURIComponent(token)}`;
   let emailSent = true;
   try {
-    await sendMail({
+    emailSent = await sendMail({
       to: user.email,
       subject: 'Επαναφορά κωδικού στο Bid Manager',
       text: [

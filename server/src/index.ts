@@ -10,6 +10,10 @@ const server = app.listen(config.port, () => {
   logger.info({ port: config.port, env: config.env }, 'bid-manager server listening');
 });
 
+if (config.isProd && !config.smtp.host) {
+  logger.warn('SMTP_HOST is not set: invitations, password resets and notifications will NOT be e-mailed');
+}
+
 startJobs().catch((err: unknown) => logger.error({ err }, 'failed to start jobs'));
 
 // Last line of defence: nothing should reach these, but if it does it must be visible in error tracking.

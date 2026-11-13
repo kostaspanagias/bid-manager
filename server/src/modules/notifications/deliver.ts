@@ -1,5 +1,6 @@
 // One place that sends an e-mail and records it in email_log. The unique (org_id, dedupe_key) makes every
 // notification idempotent: a key that was already sent is never sent again.
+import { config } from '../../config.js';
 import { logger } from '../../core/logger.js';
 import { sendMail } from '../../core/mailer.js';
 import type { ScopedDb } from '../../db/scoped.js';
@@ -35,7 +36,10 @@ export async function deliver(db: ScopedDb, d: Delivery): Promise<DeliveryResult
   );
   if (!claim) return 'duplicate';
   try {
-    await sendMail({ to: d.to, subject: d.mail.subject, text: d.mail.text, html: d.mail.html });
+    const handedOver = await sendMail({ to: d.to, subject: d.mail.subject, text: d.mail.text, html: d.mail.html });
+    // Development without SMTP: the mail was written to the log, which is the delivery there. In production a
+    // missing SMTP configuration must not look like a sent e-mail.
+    if (!handedOver && config.isProd) throw new Error('SMTP is not configured (SMTP_HOST is empty)');
   } catch (err) {
     logger.error({ err, kind: d.kind, userId: d.userId }, 'e-mail delivery failed');
     await db.sql("UPDATE email_log SET status = 'failed', error = :error WHERE org_id = :org_id AND id = :id", {

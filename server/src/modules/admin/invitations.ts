@@ -52,7 +52,7 @@ router.post('/', async (req, res) => {
   const inviteUrl = `${config.appUrl}/invite/${encodeURIComponent(token)}`;
   let emailSent = true;
   try {
-    await sendMail({
+    emailSent = await sendMail({
       to: body.email,
       subject: 'Πρόσκληση στο Bid Manager',
       text: [
