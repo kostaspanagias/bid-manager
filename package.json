@@ -2,13 +2,19 @@
   "name": "bid-manager",
   "private": true,
   "type": "module",
-  "workspaces": ["server", "web"],
+  "workspaces": [
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w server && npm run build -w web",
     "test": "npm test -w server",
     "migrate": "npm run migrate -w server",
-    "seed": "npm run seed -w server"
+    "seed": "npm run seed -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "start": "npm run start -w server",
+    "e2e": "node web/e2e/full-flow.mjs"
   }
 }

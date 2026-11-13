@@ -609,6 +609,32 @@ describe('team: GET/PUT /api/tenders/:id/members', () => {
     expect(await dbFor(w.org).count('tender_member', { tender_id: res.tender.id })).toBe(3);
   });
 
+  it('a gate approver chosen by hand who leaves the team is replaced — a gate never keeps an approver who cannot open the tender', async () => {
+    const w = await world();
+    const mgmt = await createUser(w.org, 'approver');
+    const extra = await createUser(w.org, 'approver');
+    const manager = await createUser(w.org, 'bid_manager');
+    const res = await create(w, { members: [{ user_id: mgmt.id, role_key: 'MGMT' }, { user_id: extra.id, role_key: null }] });
+    const id = res.tender.id as string;
+    const api = await as(w.admin);
+    const gates = (await api.get(`/api/tenders/${id}/gates`)).body.items as { id: string; key: string }[];
+    const gate = (key: string) => gates.find((g) => g.key === key)!;
+    // G2 → the plain member "extra" (by hand), G4 → a bid manager who is not on the team (allowed: reaches every tender)
+    expect((await api.patch(`/api/tenders/${id}/gates/${gate('G2').id}`).send({ approver_user_id: extra.id })).status).toBe(200);
+    expect((await api.patch(`/api/tenders/${id}/gates/${gate('G4').id}`).send({ approver_user_id: manager.id })).status).toBe(200);
+    await api.post(`/api/tenders/${id}/gates/${gate('G2').id}/request`).expect(200);
+
+    // extra leaves the team
+    expect((await api.put(`/api/tenders/${id}/members`).send({ members: [{ user_id: mgmt.id, role_key: 'MGMT' }] })).status).toBe(200);
+    const after = (await api.get(`/api/tenders/${id}/gates`)).body.items as { key: string; approver_user_id: string | null; requested_at: string | null }[];
+    const g2 = after.find((g) => g.key === 'G2')!;
+    expect(g2.approver_user_id).toBe(mgmt.id); // back to the holder of the gate's role
+    expect(g2.requested_at).toBeNull(); // the request was addressed to somebody else
+    expect(after.find((g) => g.key === 'G4')!.approver_user_id).toBe(manager.id);
+    // and the former approver really cannot reach it any more
+    expect((await as(extra).get(`/api/tenders/${id}/gates`)).status).toBe(403);
+  });
+
   it('members read the team but only admin / bid manager change it', async () => {
     const w = await world();
     const res = await create(w);

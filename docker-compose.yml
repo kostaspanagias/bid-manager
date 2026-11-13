@@ -1,0 +1,74 @@
+# Bid Manager on one host (VPS): app + PostgreSQL 16, HTTPS by Caddy.
+#   cp .env.example .env   # fill in every value marked REQUIRED
+#   docker compose up -d --build
+#   docker compose exec app node server/dist/db/seed.js      # first run only: organization, admin, holidays, «L v1.1»
+# NOTE: not started in the environment it was authored in (no Docker daemon there) — see README.md.
+name: bid-manager
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bidmanager
+      POSTGRES_USER: ${DB_OWNER_USER:-bidmanager_owner}
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD in .env}
+      APP_DB_USER: ${DB_APP_USER:-bidmanager_app}
+      APP_DB_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./ops/docker/initdb-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    # no published port: the database is reachable only from the app container
+
+  app:
+    build: .
+    image: bid-manager:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      # the application connects as the restricted role …
+      DATABASE_URL: postgres://${DB_APP_USER:-bidmanager_app}:${DB_APP_PASSWORD}@db:5432/bidmanager
+      # … and migrations run (at start) as the owner, then grant the application role its rights
+      MIGRATION_DATABASE_URL: postgres://${DB_OWNER_USER:-bidmanager_owner}:${DB_OWNER_PASSWORD}@db:5432/bidmanager
+      APP_DATABASE_ROLE: ${DB_APP_USER:-bidmanager_app}
+      FILE_STORAGE_DIR: /data/storage
+      TRUST_PROXY: "1" # exactly one proxy (Caddy) in front
+    volumes:
+      - file-storage:/data/storage # AES-256-GCM ciphertext; useless without FILE_ENCRYPTION_KEY
+    networks: [internal]
+    # health check: defined in the image (GET /api/health)
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+    volumes:
+      - ./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [internal]
+
+volumes:
+  db-data:
+  file-storage:
+  caddy-data:
+  caddy-config:
+
+networks:
+  internal:

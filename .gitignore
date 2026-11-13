@@ -1,5 +1,9 @@
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
 storage/
 *.log
+# end-to-end run output (screenshots, server log, import file, report)
+web/e2e/out/

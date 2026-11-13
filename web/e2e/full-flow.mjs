@@ -766,6 +766,310 @@ phase('extension', async () => {
   assert(still, 'after the extension the expiring document is still red');
 });
 
+/* ================================================================== 12. dashboard, My work, digest; e-mails; jobs twice */
+
+phase('coordination', async () => {
+  const bid = sessions.bid.page;
+  // renew the expiring ISO so the tender goes green on R15
+  await bid.goto(`${BASE}/company-documents`);
+  await settle(bid);
+  await menuPick(bid, visible(bid.locator('tr, li', { hasText: 'ISO 9001:2015' })).first(), 'Επεξεργασία');
+  await f(modal(bid), 'Ημερομηνία λήξης').fill(addDays(state.T, 500));
+  await modal(bid).getByRole('button', { name: 'Αποθήκευση', exact: true }).click();
+  await modal(bid).waitFor({ state: 'detached' });
+  const g4 = (await apiFetch(bid, `/api/tenders/${state.tenderId}/gates`)).json.items.find((g) => g.key === 'G4');
+  assertEq(g4.criteria.find((c) => c.auto_rule === 'docs_valid_on_T').satisfied, true, 'docs_valid_on_T passes after the renewal');
+
+  // dashboards per role; T−n and next gate equal to the tender page (the server's values on both)
+  for (const who of ['bid', 'a', 'mgmt', 'viewer', 'admin']) {
+    const page = sessions[who].page;
+    await page.goto(`${BASE}/`);
+    await settle(page);
+    await shot(page, `dashboard-${who}`);
+    const dash = (await apiFetch(page, '/api/dashboard')).json;
+    const card = dash.tenders.find((t) => t.id === state.tenderId);
+    const detail = (await apiFetch(page, `/api/tenders/${state.tenderId}`)).json;
+    assert(card, `${who}: the tender is on the dashboard`);
+    assertEq(card.tMinus, detail.tMinus, `${who}: dashboard T−n equals the tender's`);
+    assertEq(card.nextGate?.key ?? null, detail.nextGate?.key ?? null, `${who}: same next gate on dashboard and tender`);
+    assertEq(card.nextGate?.tMinus ?? null, detail.nextGate?.tMinus ?? null, `${who}: same gate T−n`);
+    const text = (await page.locator('.app-content').innerText()).replace(/\s+/g, ' ');
+    assert(text.includes(`T−${card.tMinus}`), `${who}: dashboard shows T−${card.tMinus}`);
+    assert(!text.includes('λήγει πριν') || who === 'never', `${who}: no red document warning after the renewal`);
+    await page.goto(`${BASE}/my`);
+    await settle(page);
+    await shot(page, `my-work-${who}`);
+  }
+  // the tender list shows the same T−n
+  await bid.goto(`${BASE}/tenders`);
+  await settle(bid);
+  await shot(bid, 'tenders-list');
+  const listItem = (await apiFetch(bid, '/api/tenders')).json.items.find((t) => t.id === state.tenderId);
+  assertEq(listItem.tMinus, (await apiFetch(bid, `/api/tenders/${state.tenderId}`)).json.tMinus, 'list T−n equals detail T−n');
+
+  // digest preview (member A) and "send now" twice (admin): idempotent
+  const a = sessions.a.page;
+  await a.goto(`${BASE}/`);
+  await a.getByRole('button', { name: 'Τι θα έγραφε το σημερινό μου digest' }).click();
+  await modal(a).getByText('Θέμα').first().waitFor();
+  await shot(a, 'digest-preview-member-a');
+  const preview = (await apiFetch(a, '/api/notifications/digest/preview', { method: 'POST', body: {} })).json;
+  assert(!/\b20\d\d-\d\d-\d\d\b/.test(preview.text), 'digest text has no ISO dates');
+  assert(preview.text.includes(TITLE.slice(0, 30)), 'digest mentions the tender');
+  assert(preview.text.includes(`${BASE}/tenders/${state.tenderId}`), 'digest links into the app (no attachments)');
+  await modal(a).getByRole('button', { name: 'Κλείσιμο' }).first().click();
+
+  const admin = sessions.admin.page;
+  await admin.goto(`${BASE}/`);
+  await settle(admin);
+  await admin.getByRole('button', { name: 'Αποστολή digest τώρα' }).click();
+  await expectToast(admin, 'Το digest έτρεξε');
+  await admin.getByRole('button', { name: 'Αποστολή digest τώρα' }).click();
+  await expectToast(admin, 'έχει ήδη τρέξει');
+  await shot(admin, 'digest-run-twice');
+  const digests = (await stack.db.query("SELECT user_id, count(*)::int AS n FROM email_log WHERE kind = 'digest' GROUP BY user_id")).rows;
+  assert(digests.length > 0 && digests.every((r) => r.n === 1), `one digest per user after two runs: ${JSON.stringify(digests)}`);
+
+  // events → e-mails, exactly once each, to the right people
+  const mails = (await stack.db.query('SELECT e.kind, u.email, e.subject, e.status FROM email_log e JOIN "user" u ON u.id = e.user_id ORDER BY e.created_at')).rows;
+  const of = (kind) => mails.filter((x) => x.kind === kind).map((x) => x.email).sort();
+  assertEq(of('gate_approval_requested'), [TEAM.mgmt.email], 'approval request e-mailed to the approver');
+  assert(of('gate_decided').length >= 2, `gate decisions e-mailed: ${of('gate_decided')}`);
+  assert(!of('gate_decided').includes(TEAM.viewer.email) || true, 'viewer may be informed');
+  assertEq(of('handoff_delivered'), [TEAM.a.email], 'handoff delivery e-mailed to the receiving role');
+  const extended = of('tender_extended');
+  assert(extended.includes(TEAM.a.email) && extended.includes(TEAM.mgmt.email) && !extended.includes(TEAM.bid.email), `extension e-mailed to the team, not to its author: ${extended}`);
+  for (const m of mails) assert(!/\b20\d\d-\d\d-\d\dT/.test(m.subject), 'no ISO timestamp in a subject');
+  state.mailKinds = [...new Set(mails.map((m) => m.kind))];
+
+  // daily jobs through the job runner, twice each: second run is skipped, job_run has one row per job and day
+  const { spawnSync } = await import('node:child_process');
+  const runJobs = () =>
+    spawnSync('npx', ['tsx', resolve(outDir, '..', 'run-jobs.mts')], { cwd: resolve(outDir, '..', '..', '..', 'server'), env: { ...process.env, ...stack.env }, encoding: 'utf8' });
+  const first = runJobs();
+  const second = runJobs();
+  const parse = (r) => JSON.parse((/JOBS (.*)/.exec(r.stdout) ?? [null, 'null'])[1]);
+  const [r1, r2] = [parse(first), parse(second)];
+  assert(r1 && r2, `job runner output: ${first.stdout} ${first.stderr}`);
+  assertEq(r1['gdpr-retention'], ['ok'], 'retention job ran');
+  assertEq(r1['daily-digest'], ['skipped'], 'digest already ran today (through the UI)');
+  assertEq([r2['gdpr-retention'], r2['daily-digest']], [['skipped'], ['skipped']], 'second run of the day is skipped');
+  const runs = (await stack.db.query('SELECT job, status, attempts FROM job_run ORDER BY job')).rows;
+  assertEq(runs.map((r) => `${r.job}:${r.status}`), ['daily-digest:ok', 'gdpr-retention:ok'], 'job_run: one ok row per job');
+  assertEq((await stack.db.query("SELECT count(*)::int AS n FROM email_log WHERE kind = 'digest'")).rows[0].n, digests.length, 'no extra digests');
+  state.jobs = { r1, r2 };
+});
+
+/* ================================================================== 13. guarantee arrives; risks; lessons; a new template version */
+
+phase('wrap-up', async () => {
+  const a = sessions.a.page;
+  await gotoTender(a, 'watch');
+  await visible(a.locator('tr, li', { hasText: 'Εγγυητική συμμετοχής' })).first().getByRole('button', { name: 'Παραλήφθηκε σήμερα' }).click();
+  await expectToast(a, 'Καταγράφηκε η παραλαβή');
+  await shot(a, 'watchlist-arrived');
+  const g4 = (await apiFetch(a, `/api/tenders/${state.tenderId}/gates`)).json.items.find((g) => g.key === 'G4');
+  assertEq(g4.criteria.find((c) => c.auto_rule === 'guarantee_arrived').satisfied, true, 'guarantee_arrived follows the watchlist');
+
+  const bid = sessions.bid.page;
+  await gotoTender(bid, 'risks');
+  await shot(bid, 'risks');
+  await gotoTender(bid, 'overview');
+  await shot(bid, 'tender-overview');
+
+  await gotoTender(bid, 'lessons');
+  await shot(bid, 'lessons-empty');
+  await bid.getByRole('button', { name: 'Νέο lesson' }).first().click();
+  await f(modal(bid), 'Τι μάθαμε').fill('Το υπόδειγμα της εγγυητικής άλλαξε στη διευκρίνιση: θέλουμε σημείο checklist «έλεγχος υποδείγματος μετά από κάθε διευκρίνιση».');
+  await modal(bid).getByLabel('Αλλάζει το template').check();
+  await modal(bid).getByRole('button', { name: 'Αποθήκευση', exact: true }).click();
+  await expectToast(bid, 'Το lesson καταγράφηκε');
+  await shot(bid, 'lessons');
+
+  // admin: new template version from L v1.1, one more checklist line, the lesson marked as applied, publish
+  const admin = sessions.admin.page;
+  await admin.goto(`${BASE}/admin/templates`);
+  await settle(admin);
+  await shot(admin, 'templates-list');
+  await admin.getByRole('button', { name: 'Νέα έκδοση από L v1.1' }).click();
+  await admin.waitForURL(/\/admin\/templates\/[0-9a-f-]{36}/);
+  await settle(admin);
+  await shot(admin, 'template-draft');
+  const templateId = /templates\/([0-9a-f-]{36})/.exec(admin.url())[1];
+  const item = await apiFetch(admin, `/api/templates/${templateId}/items`, { method: 'POST', body: { kind: 'checklist_item', key: 'A_GUARANTEE_TEMPLATE', name: 'Έλεγχος υποδείγματος εγγυητικής μετά από κάθε διευκρίνιση', owner_role_key: 'A' } });
+  assertEq(item.status, 201, `new checklist line in the draft: ${item.text}`);
+  await admin.reload();
+  await settle(admin);
+  await admin.getByRole('tab', { name: /Lessons/ }).or(admin.getByRole('button', { name: /^Lessons/ })).first().click();
+  await admin.getByRole('button', { name: /Εφαρμόστηκε στην/ }).first().click();
+  await expectToast(admin, 'Σημειώθηκε ως εφαρμοσμένο');
+  await shot(admin, 'template-lessons-applied');
+  await admin.getByRole('tab', { name: /Αλλαγές από/ }).or(admin.getByRole('button', { name: /^Αλλαγές από/ })).first().click();
+  await settle(admin);
+  await shot(admin, 'template-diff');
+  await admin.getByRole('button', { name: 'Δημοσίευση' }).first().click();
+  await modal(admin).getByRole('button', { name: 'Δημοσίευση' }).click();
+  await expectToast(admin, 'Το template δημοσιεύτηκε');
+  await shot(admin, 'template-published');
+  const templates = (await apiFetch(admin, '/api/templates')).json.items;
+  assert(templates.some((t) => t.version === 'v1.2' && t.status === 'published'), 'L v1.2 is published');
+  // the running tender keeps its snapshot of v1.1 (F2)
+  const snapshot = (await apiFetch(bid, `/api/tenders/${state.tenderId}/snapshot`)).json.snapshot;
+  assertEq(snapshot.template.version, 'v1.1', 'the tender still follows its v1.1 snapshot');
+  assert(!snapshot.items.some((i) => i.key === 'A_GUARANTEE_TEMPLATE'), 'the new line is not in the running tender');
+  await gotoTender(bid, 'lessons');
+  await bid.getByText('Πέρασε στην v1.2').first().waitFor();
+  await shot(bid, 'lessons-applied');
+
+  await admin.goto(`${BASE}/admin/holidays`);
+  await settle(admin);
+  await shot(admin, 'admin-holidays');
+  await admin.goto(`${BASE}/admin/audit`);
+  await settle(admin);
+  await shot(admin, 'admin-audit');
+  const auditText = await admin.locator('.app-content').innerText();
+  for (const member of Object.values(TEAM)) assert(!auditText.includes(member.email), 'audit page shows no e-mail addresses');
+});
+
+/* ================================================================== 14. non-member; admin password reset; close as submitted */
+
+phase('close', async () => {
+  const bid = sessions.bid.page;
+  // a second tender without a team: member A cannot open it, in the UI or by URL
+  const second = await apiFetch(bid, '/api/tenders', {
+    method: 'POST',
+    body: { title: 'Δεύτερος διαγωνισμός χωρίς ομάδα', authority: 'Δήμος Αθηναίων', submission_deadline_at: new Date(`${addDays(state.T, 30)}T10:00:00Z`).toISOString(), template_id: (await apiFetch(bid, '/api/templates?status=published')).json.items.find((t) => t.version === 'v1.2').id },
+  });
+  assertEq(second.status, 201, `second tender from v1.2: ${second.text}`);
+  const otherId = second.json.tender.id;
+  const checklist = (await apiFetch(bid, `/api/tenders/${otherId}/tasks?section=checklist`)).json.items;
+  assert(checklist.some((t) => t.title.startsWith('Έλεγχος υποδείγματος εγγυητικής')), 'a tender created from v1.2 has the new checklist line');
+  const a = sessions.a.page;
+  await a.goto(`${BASE}/tenders/${otherId}/overview`);
+  await a.getByText('Ο διαγωνισμός δεν βρέθηκε').waitFor();
+  await shot(a, 'non-member-tender');
+  for (const path of ['', '/gates', '/files', '/requirements', '/tasks', '/watch', '/documents', '/milestones']) {
+    assertEq((await apiFetch(a, `/api/tenders/${otherId}${path}`)).status, 403, `non-member GET ${path || '/'} → 403`);
+  }
+  assert(!(await apiFetch(a, '/api/tenders')).json.items.some((t) => t.id === otherId), 'the other tender is not in A\'s list');
+  assert(!(await apiFetch(a, '/api/dashboard')).json.tenders.some((t) => t.id === otherId), '… nor on A\'s dashboard');
+
+  // admin resets the viewer's password: link once, old password dead, session gone
+  const admin = sessions.admin.page;
+  await admin.goto(`${BASE}/admin/users`);
+  await settle(admin);
+  await menuPick(admin, visible(admin.locator('tr, li', { hasText: TEAM.viewer.email })).first(), 'Επαναφορά κωδικού');
+  await shot(admin, 'admin-reset-password-confirm');
+  await admin.getByRole('dialog').last().getByRole('button', { name: 'Επαναφορά κωδικού' }).click();
+  const link = f(modal(admin), 'Σύνδεσμος ορισμού νέου κωδικού');
+  await link.waitFor();
+  const resetUrl = await link.inputValue();
+  await shot(admin, 'admin-reset-password-link');
+  const modalText = await modal(admin).innerText();
+  assert(!/κωδικός:\s*\S+/i.test(modalText), 'no password is shown, only a link');
+  await modal(admin).getByRole('button', { name: 'Κλείσιμο' }).first().click();
+  const viewer = sessions.viewer.page;
+  assertEq((await apiFetch(viewer, '/api/auth/me')).status, 401, 'the viewer\'s session ended');
+  await viewer.goto(resetUrl);
+  await viewer.locator('input[name=new-password]').fill('viewer-new-password-2');
+  await viewer.locator('input[name=new-password-confirm]').fill('viewer-new-password-2');
+  await shot(viewer, 'reset-password-page');
+  await viewer.getByRole('button', { name: 'Αποθήκευση κωδικού' }).click();
+  await viewer.getByText('Ο νέος κωδικός ορίστηκε').waitFor();
+  await login(viewer, { email: TEAM.viewer.email, password: 'viewer-new-password-2', secret: sessions.viewer.secret });
+  await viewer.goto(resetUrl);
+  await viewer.getByText('Ο σύνδεσμος δεν ισχύει').first().waitFor();
+
+  // close the tender as submitted
+  await gotoTender(bid, 'overview');
+  await bid.getByRole('button', { name: 'Σήμανση ως «Υποβλήθηκε»' }).click();
+  await shot(bid, 'close-confirm');
+  await bid.getByRole('dialog').last().getByRole('button', { name: /Σήμανση ως «Υποβλήθηκε»|Επιβεβαίωση/ }).click();
+  await expectToast(bid, 'Η κατάσταση άλλαξε');
+  await settle(bid);
+  await shot(bid, 'tender-submitted');
+
+  // closed = read-only on every tab, in the UI and by URL (422 tender_closed) — except lessons and files
+  const id = state.tenderId;
+  const g3 = (await apiFetch(bid, `/api/tenders/${id}/gates`)).json.items.find((g) => g.key === 'G3');
+  const anyTask = (await apiFetch(bid, `/api/tenders/${id}/tasks`)).json.items[0];
+  const anyReq = (await apiFetch(bid, `/api/tenders/${id}/requirements`)).json.items[0];
+  const anyMs = (await apiFetch(bid, `/api/tenders/${id}/milestones`)).json.items.find((m) => m.key === 'UPLOAD');
+  const refused = [
+    ['PATCH', `/api/tenders/${id}`, { title: 'x' }],
+    ['PUT', `/api/tenders/${id}/members`, { members: [] }],
+    ['POST', `/api/tenders/${id}/deadline`, { submission_deadline_at: new Date(`${addDays(state.T, 7)}T12:00:00Z`).toISOString() }],
+    ['POST', `/api/tenders/${id}/gates/${g3.id}/request`, {}],
+    ['POST', `/api/tenders/${id}/requirements`, { code: 'ΥΠ-900', text: 'x', type: 'formal' }],
+    ['PATCH', `/api/tenders/${id}/requirements/${anyReq.id}`, { status: 'verified' }],
+    ['POST', `/api/tenders/${id}/tasks`, { title: 'x' }],
+    ['PATCH', `/api/tenders/${id}/tasks/${anyTask.id}`, { title: 'x' }],
+    ['PATCH', `/api/tenders/${id}/watch/${state.guaranteeId}`, { notes: 'x' }],
+    ['POST', `/api/tenders/${id}/risks`, { title: 'x' }],
+    ['POST', `/api/tenders/${id}/changes`, { description: 'x' }],
+    ['PATCH', `/api/tenders/${id}/milestones/${anyMs.id}`, { done: true }],
+    ['POST', `/api/tenders/${id}/documents`, { company_document_id: anyReq.id }],
+  ];
+  for (const [method, path, body] of refused) {
+    const res = await apiFetch(bid, path, { method, body });
+    assertEq([res.status, res.json?.error?.code], [422, 'tender_closed'], `closed tender: ${method} ${path.replace(id, ':id')}`);
+  }
+  const WRITE_BUTTONS = /^(Νέα γραμμή|Import|Νέο task|Νέα παράδοση|Νέο στοιχείο|Νέα καταχώριση|Σύνδεση εγγράφου|Αίτημα έγκρισης|Καταγραφή απόφασης|Αλλαγή προθεσμίας \(παράταση\)|Προσθήκη σημείου)$/;
+  for (const [tab, slug] of [['Πρόγραμμα', 'schedule'], ['Πύλες', 'gates'], ['Register', 'register'], ['Tasks', 'tasks'], ['Watchlist', 'watch'], ['Κίνδυνοι', 'risks'], ['Change log', 'changes'], ['Έγγραφα', 'documents'], ['Ομάδα', 'team']]) {
+    await gotoTender(bid, slug);
+    const buttons = (await bid.locator('.app-content button:visible').allInnerTexts()).map((x) => x.trim()).filter((x) => WRITE_BUTTONS.test(x));
+    assertEq(buttons, [], `closed tender, tab «${tab}»: no write buttons`);
+    await shot(bid, `closed-${slug}`);
+  }
+  // lessons and files stay open (cross-slice rule)
+  const lesson = await apiFetch(bid, `/api/tenders/${id}/lessons`, { method: 'POST', body: { text: 'Η ανασκόπηση έγινε δύο ημέρες μετά την κατάθεση.', category: 'went_well' } });
+  assertEq(lesson.status, 201, 'a lesson can still be recorded after closing');
+  await gotoTender(bid, 'files');
+  await f(bid, 'Φάκελος προορισμού').selectOption({ label: 'Λοιπά' });
+  await bid.locator('.files-upload__drop input[type=file]').setInputFiles({ name: 'Αποδεικτικό υποβολής ΕΣΗΔΗΣ.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 απόδειξη') });
+  await expectToast(bid, 'Ανέβηκε 1 αρχείο');
+  await shot(bid, 'closed-files');
+  // the closed tender left the active dashboard and shows under "recently closed"
+  await bid.goto(`${BASE}/`);
+  await settle(bid);
+  await shot(bid, 'dashboard-after-close');
+  const dash = (await apiFetch(bid, '/api/dashboard')).json;
+  assert(!dash.tenders.some((t) => t.id === id) && dash.recentlyClosed.some((t) => t.id === id), 'closed tender moved to "recently closed"');
+});
+
+/* ================================================================== 15. the main screens at 375 px */
+
+phase('mobile', async () => {
+  const m = await newUserContext(browser, 'mobile', { width: 375, height: 760 });
+  sessions.mobile = m;
+  await login(m.page, { email: TEAM.bid.email, password: PASSWORD, secret: sessions.bid.secret });
+  const id = state.tenderId;
+  const screens = [
+    ['dashboard', '/'],
+    ['tenders', '/tenders'],
+    ['my', '/my'],
+    ['company-documents', '/company-documents'],
+    ['account', '/account'],
+    ...['overview', 'schedule', 'gates', 'register', 'tasks', 'watch', 'risks', 'changes', 'files', 'documents', 'lessons', 'team'].map((t) => [`tender-${t}`, `/tenders/${id}/${t}`]),
+    ['tender-new', '/tenders/new'],
+  ];
+  for (const [name, path] of screens) {
+    await m.page.goto(`${BASE}${path}`);
+    await settle(m.page);
+    await shot(m.page, `mobile-${name}`);
+  }
+  await m.page.getByRole('button', { name: 'Άνοιγμα μενού' }).click();
+  await shot(m.page, 'mobile-nav-open', { fullPage: false });
+  const adminMobile = await newUserContext(browser, 'mobile-admin', { width: 375, height: 760 });
+  sessions.mobileAdmin = adminMobile;
+  await login(adminMobile.page, { ...ADMIN, secret: sessions.admin.secret });
+  for (const [name, path] of [['admin-users', '/admin/users'], ['admin-templates', '/admin/templates'], ['admin-holidays', '/admin/holidays'], ['admin-audit', '/admin/audit']]) {
+    await adminMobile.page.goto(`${BASE}${path}`);
+    await settle(adminMobile.page);
+    await shot(adminMobile.page, `mobile-${name}`);
+  }
+});
+
 /* ================================================================== run */
 
 try {

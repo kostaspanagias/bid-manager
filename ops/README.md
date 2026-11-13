@@ -1,4 +1,4 @@
-# Bid Manager — backups
+# Bid Manager — operations: backups, database roles, maintenance
 
 Covers the spec's non-functional row **Backups**: a daily dump of the database and of the file storage, encrypted,
 kept in a second location for 30 days, with a restore test every quarter.
@@ -112,3 +112,42 @@ application's own storage code decrypted all 7 restored blobs to the sha256 reco
 pruning removes only `bidmanager-*` directories older than the retention period; a second restore into the same
 targets is refused; a wrong passphrase and a damaged archive stop the restore with a non-zero exit and leave the
 target database empty; a passphrase file with loose permissions is refused.
+
+## Database roles (recommended hardening)
+
+The application works with a single database role, but production should use two:
+
+| Role | Used by | Rights |
+| --- | --- | --- |
+| owner (e.g. `bidmanager_owner`) | migrations only (`MIGRATION_DATABASE_URL`) | owns the schema |
+| application (e.g. `bidmanager_app`) | the running server (`DATABASE_URL`) | SELECT / INSERT / UPDATE / DELETE on the data tables; on **`audit_log` only INSERT and SELECT**; no DDL |
+
+Why: the audit log is append-only through a trigger, and a trigger can be disabled or dropped by the table's owner.
+With two roles the running application is not the owner, so even a compromised server process (or a leaked
+`DATABASE_URL`) cannot rewrite or delete audit history, nor change the schema.
+
+- **docker-compose.yml already does this**: `ops/docker/initdb-roles.sh` creates the application role when the
+  database volume is first created, and every container start runs the migrations as the owner and then re-applies
+  the grants (`APP_DATABASE_ROLE`).
+- **Without Docker**: run `ops/sql/two-roles.sql` once as a PostgreSQL superuser, then migrate with
+  `MIGRATION_DATABASE_URL=<owner url> APP_DATABASE_ROLE=bidmanager_app npm run migrate:prod -w server` (repeat after
+  every upgrade — new tables need their grants) and start the server with `DATABASE_URL=<application url>`.
+- Backups (`backup.sh`) and the restore test connect as the owner (or a superuser): `pg_dump` needs to read everything.
+- Check after setting up: as the application role, `DELETE FROM audit_log` and `ALTER TABLE audit_log DISABLE TRIGGER ALL`
+  must both fail with a permission error. (Verified on 13/11/2026 against PostgreSQL 16 with the production build:
+  migrate + seed + login work as the application role; both statements are refused.)
+
+## One-off maintenance: personal data in old audit rows
+
+Since the integration release, names and e-mail addresses of users and invited people are no longer copied into
+`audit_log` (the row keeps the id and which field changed; the value reads `[redacted]`), because an append-only log
+could never honour a GDPR erasure. Rows written **before** that still contain them. On an installation that was in
+use before this release run `ops/sql/redact-audit-personal-data.sql` once, as the schema owner — the file's header
+explains exactly what it changes. A fresh installation does not need it.
+
+## Daily jobs
+
+The 07:00 (Europe/Athens) jobs — digest, retention — are recorded in `job_run` (one row per organization, job and
+day). If the server was down or restarting at 07:00, or a run failed (e.g. SMTP outage), it is caught up automatically:
+at start-up and every hour until 12:59 the runner retries what has no successful row for the day. A run that is still
+`failed` after 13:00 needs a look at the server log and `email_log`.

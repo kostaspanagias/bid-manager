@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { unprocessable } from '../../core/errors.js';
 import { emit } from '../../core/events.js';
 import { zDate, zUuid } from '../../core/http.js';
-import { accessibleTenderIds, requireRole, requireTenderAccess, seesUserEmails } from '../../core/permissions.js';
+import { accessibleTenderIds, requireRole, requireTenderAccess } from '../../core/permissions.js';
 import type { Row } from '../../db/scoped.js';
 import { workingDaysBetween } from '../../domain/calendar.js';
 import { loadHolidays } from '../../domain/holidays.js';
@@ -268,10 +268,7 @@ router.post('/:id/status', manage, async (req, res) => {
 
 router.get('/:id/members', async (req, res) => {
   const tender = await requireTenderAccess(req.ctx, String(req.params.id), 'read');
-  const team = await listMembers(req.ctx.db, tender.id);
-  // a viewer (partner, external director) sees who is on the team, not their e-mail addresses
-  if (!seesUserEmails(req.ctx)) for (const m of team.items) m.user.email = null;
-  res.json(team);
+  res.json(await listMembers(req.ctx.db, tender.id));
 });
 
 router.put('/:id/members', manage, async (req, res) => {

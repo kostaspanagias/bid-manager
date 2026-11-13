@@ -1,3 +1,4 @@
+import { gateShortName } from '@/lib/enums';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -162,7 +163,7 @@ export function TenderOverviewTab() {
               <div className="next-gate">
                 <Badge tone="info">{nextGate.key}</Badge>
                 <div className="next-gate__body">
-                  <strong>{nextGate.name}</strong>
+                  <strong>{gateShortName(nextGate.key, nextGate.name)}</strong>
                   <span>
                     <DateText value={nextGate.due_date} withWeekday /> <TMinus n={nextGate.tMinus} tone="neutral" />
                   </span>

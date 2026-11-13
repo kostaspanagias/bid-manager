@@ -305,7 +305,7 @@ describe('/api/users (directory)', () => {
     expect((await as(manager).get('/api/users')).body.items.map((u: { name: string }) => u.name)).toEqual(['Anna', 'Zed', 'Zz manager']);
   });
 
-  it('everyone else sees only the people they share a tender with; a viewer never gets e-mail addresses (review M4)', async () => {
+  it('everyone else sees only the people they share a tender with (review M4)', async () => {
     const org = await createOrg();
     const admin = await createUser(org, 'admin', { name: 'Admin' });
     const manager = await createUser(org, 'bid_manager', { name: 'Manager' });
@@ -323,22 +323,17 @@ describe('/api/users (directory)', () => {
     expect(await names(anna)).toEqual(['Admin', 'Anna', 'Bob', 'Manager', 'Viewer']);
     expect(await names(carol)).toEqual(['Admin', 'Carol', 'Manager']);
     expect(await names(loner)).toEqual(['Loner']);
+    // a viewer is an internal partner: same directory rule, e-mail addresses included (product owner decision)
     const asViewer = (await as(viewer).get('/api/users')).body.items as { id: string; name: string; email: string | null }[];
     expect(asViewer.map((u) => u.name)).toEqual(['Admin', 'Anna', 'Bob', 'Manager', 'Viewer']);
-    expect(asViewer.filter((u) => u.email !== null).map((u) => u.id)).toEqual([viewer.id]); // only their own
-    const text = JSON.stringify(asViewer);
-    for (const u of [admin, manager, anna, bob, carol]) expect(text).not.toContain(u.email);
-    expect((await as(anna).get('/api/users')).body.items.find((u: { id: string }) => u.id === bob.id).email).toBe(bob.email);
+    expect(asViewer.every((u) => typeof u.email === 'string')).toBe(true);
+    expect(JSON.stringify(asViewer)).not.toContain(carol.email);
 
-    // the same rules in the register's owner picker and in the team list
+    // the same rule in the register's owner picker
     await addRole(t1, 'A');
     const owners = async (u: { id: string; org_id: string }) => (await as(u).get(`/api/tenders/${t1.id}/requirements`)).body.owners.users as { name: string; email: string | null }[];
     expect((await owners(anna)).map((u) => u.name)).toEqual(['Admin', 'Anna', 'Bob', 'Manager', 'Viewer']);
     expect((await owners(admin)).map((u) => u.name)).toContain('Carol');
-    expect((await owners(viewer)).every((u) => u.email === null)).toBe(true);
-    const team = (await as(viewer).get(`/api/tenders/${t1.id}/members`)).body.items as { user: { email: string | null } }[];
-    expect(team.length).toBe(3);
-    expect(team.every((m) => m.user.email === null)).toBe(true);
-    expect(((await as(anna).get(`/api/tenders/${t1.id}/members`)).body.items as { user: { email: string | null } }[]).every((m) => typeof m.user.email === 'string')).toBe(true);
+    expect((await owners(viewer)).map((u) => u.name)).not.toContain('Carol');
   });
 });

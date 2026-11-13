@@ -6,7 +6,7 @@ Express 5 + PostgreSQL API and scheduled jobs. The binding contract is `../ARCHI
 ## Run
 
 ```bash
-cp server/.env.example server/.env        # optional in development: the defaults work with the local dev database
+cp server/.env.example server/.env        # then set FILE_ENCRYPTION_KEY (openssl rand -hex 32) — required
 npm run migrate -w server                 # apply migrations/NNN_*.sql in order (idempotent)
 npm run seed -w server                    # one organization, an admin, holidays for last year … +2 (idempotent)
 npm run dev:server                        # http://localhost:3001  (GET /api/health)
@@ -18,8 +18,19 @@ npm run typecheck -w server
 empty a random password is generated and printed once). The admin enrols TOTP at first login. Further users are
 created only by invitation (`POST /api/admin/invitations`).
 
-Production needs `NODE_ENV=production`, an https `APP_URL`, `FILE_ENCRYPTION_KEY` (`openssl rand -hex 32`; it also
-encrypts TOTP secrets, so keep it stable and backed up) and `TRUST_PROXY=1` behind a reverse proxy.
+Outside the test suite the server needs its own `FILE_ENCRYPTION_KEY` (`openssl rand -hex 32`; it also encrypts
+TOTP secrets, so keep it stable and backed up) — there is no built-in development key. Production
+(`NODE_ENV=production`) additionally needs an https `APP_URL`, `SMTP_HOST`, and an explicit `TRUST_PROXY` (1 behind
+one reverse proxy); it refuses to start otherwise. `npm run build -w server` compiles to `dist/` (tests excluded);
+`npm run start`, `migrate:prod`, `seed:prod` run from there. When `../web/dist` exists the same process serves the
+web app (hashed assets immutable, `index.html` no-cache, history fallback, never under `/api`). Deployment: the
+root `README.md`.
+
+Added during integration: `POST /api/admin/users/:id/reset-password` (admin; single-use 24 h link, consumed by
+`POST /api/auth/reset-info` / `reset-password`), `core/errorTracking.ts` (`reportError`, `setErrorReporter`),
+`listApiRoutes()` in `app.ts` (every route, read from the routers — the acceptance sweep and the guard tests iterate
+it), `ensureHolidayYears()` behind `loadHolidays()`, `catchUpDailyJobs()` in the job runner, and the two-role
+database option of `migrate` (`MIGRATION_DATABASE_URL`, `APP_DATABASE_ROLE`).
 
 ## Layout
 
@@ -94,8 +105,8 @@ describe('risks', () => {
 
 ## Adding a module
 
-Every module of the MVP is already mounted in `src/app.ts` as an empty router — fill in
-`src/modules/<name>/routes.ts`, do not edit `app.ts`.
+Modules are mounted from the two tables at the top of `src/app.ts` (`TENDER_SCOPED`, `ORG_LEVEL`); a new router
+must be added there — `app.test.ts` fails if a route is mounted outside them.
 
 - Org-level routers (`/api/<name>`) sit behind `requireAuth`: `req.ctx = { orgId, user, db }` is always set and CSRF
   is already checked for mutating requests.

@@ -190,6 +190,7 @@ export function createApp(options: AppOptions = {}): Express {
       contentSecurityPolicy: { useDefaults: false, directives: cspDirectives() },
       hsts: { maxAge: 31_536_000, includeSubDomains: true },
       referrerPolicy: { policy: 'same-origin' },
+      frameguard: { action: 'deny' },
       crossOriginEmbedderPolicy: false,
     }),
   );

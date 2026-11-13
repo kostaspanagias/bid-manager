@@ -1,0 +1,19 @@
+# HTTPS in front of Bid Manager. Caddy obtains and renews the certificate (Let's Encrypt) for APP_DOMAIN and
+# redirects http → https by itself. It is the ONE proxy in front of the app, hence TRUST_PROXY=1 there: Express then
+# takes the client address from the X-Forwarded-For header Caddy sets — the login rate limit and the per-address
+# lockout work on real client IPs instead of on Caddy's own address.
+{$APP_DOMAIN} {
+	encode zstd gzip
+	# uploads go up to 200 MB (spec); leave some room for multipart overhead
+	request_body {
+		max_size 210MB
+	}
+	reverse_proxy app:3001 {
+		health_uri /api/health
+		health_interval 30s
+	}
+	header {
+		# the app already sends HSTS, CSP, nosniff …; nothing to add here
+		-Server
+	}
+}

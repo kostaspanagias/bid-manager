@@ -211,8 +211,12 @@ export async function login(page, { email, password, secret }) {
     await shot(page, `login-totp-setup-${email.split('@')[0]}`);
   }
   await code.fill(await totp(enrolled));
-  await page.getByRole('button', { name: secret ? 'Είσοδος' : 'Ενεργοποίηση και είσοδος' }).click();
-  await page.locator('.app-content').waitFor();
+  // the code step submits by itself once six digits are in; press the button only if it is still there
+  const inside = page.locator('.app-content');
+  await inside.waitFor({ timeout: 1500 }).catch(async () => {
+    await page.getByRole('button', { name: secret ? 'Είσοδος' : 'Ενεργοποίηση και είσοδος' }).click({ timeout: 3000 }).catch(() => undefined);
+  });
+  await inside.waitFor();
   return enrolled;
 }
 

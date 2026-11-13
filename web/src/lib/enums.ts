@@ -63,3 +63,9 @@ const TONES: Partial<Record<EnumGroup, Record<string, Tone>>> = {
 export function enumTone(group: EnumGroup, value: string | null | undefined): Tone {
   return (value && TONES[group]?.[value]) || 'neutral';
 }
+
+/** A gate's name without its key in front («G3 Red team» → «Red team»), for places that show the key separately. */
+export function gateShortName(key: string | null | undefined, name: string): string {
+  if (key && name.startsWith(key) && name.length > key.length) return name.slice(key.length).replace(/^[\s:·–-]+/, '');
+  return name;
+}

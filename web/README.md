@@ -9,7 +9,7 @@ Read `../ARCHITECTURE.md` first; this file covers only what a feature engineer n
 npm run dev -w web         # Vite on :5173, proxies /api → http://127.0.0.1:3001 (start the server separately)
 npm run typecheck -w web   # tsc --noEmit (strict)
 npm run build -w web       # typecheck + production build to web/dist
-node web/scripts/screenshots.mjs [filter]   # visual smoke test, no server needed (mocks /api, writes scripts/screenshots/)
+node web/e2e/full-flow.mjs   # end-to-end run against a real server and database (see e2e/README.md)
 ```
 
 ## Layout

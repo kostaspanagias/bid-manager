@@ -76,11 +76,6 @@ export async function visibleUserIds(ctx: PermCtx): Promise<Set<string> | null> 
   return new Set([ctx.user.id, ...rows.map((r) => r.user_id)]);
 }
 
-/** Whether the caller gets e-mail addresses in directories: a viewer (partner, external director) never does. */
-export function seesUserEmails(ctx: PermCtx): boolean {
-  return ctx.user.org_role !== 'viewer';
-}
-
 /**
  * R18 — who may see the financial-offer files of a tender: admin, bid_manager, approvers who are members of the
  * tender, and members holding a tender role whose payload.financial is true. A viewer never.

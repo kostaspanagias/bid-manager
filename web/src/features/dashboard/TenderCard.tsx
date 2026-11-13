@@ -1,3 +1,4 @@
+import { gateShortName } from '@/lib/enums';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '@/features/shared/StatusBadge';
@@ -72,7 +73,7 @@ export function TenderCard({ tender }: { tender: DashboardTender }) {
         {gate ? (
           <Link to={`${base}/gates`} className="dash-tender__gate">
             <span className="dash-tender__gate-head">
-              <strong>{gate.key}</strong> {gate.name}
+              <strong>{gate.key}</strong> {gateShortName(gate.key, gate.name)}
             </span>
             <span className={cx('dash-tender__gate-when', gate.overdue && 'u-text-red')}>
               <DateText value={gate.dueDate} withWeekday /> <TMinus n={gate.tMinus} tone="neutral" plain /> · {gateWhen}

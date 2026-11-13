@@ -146,7 +146,7 @@ export interface TenderMemberRow {
   id: ID;
   user_id: ID;
   tender_role_key: string | null;
-  user: { id: ID; name: string; email: string | null; org_role: OrgRole; active: boolean };
+  user: { id: ID; name: string; email: string; org_role: OrgRole; active: boolean };
 }
 export interface TeamResponse {
   roles: TenderRoleInfo[];

@@ -77,6 +77,8 @@ web/
 
 ### Tables beyond the spec's list (all with org_id)
 
+- `password_reset` (user_id, token_hash, expires_at, used_at — admin-issued set-password links) and `login_throttle`
+  (user_id, ip, failures, locked_until — per-(account, address) lockout); `"user".totp_failed_count`, `.totp_locked_until`
 - `session` (id = opaque token hash, user_id, totp_verified, csrf_token, last_seen_at, expires_at)
 - `invitation` (email, org_role, token_hash, expires_at, accepted_at)
 - `tender_role` (tender_id, key, name, payload jsonb) — the per-tender snapshot of template roles;
@@ -310,6 +312,7 @@ other slices' **tables** directly through the scoped layer — never imports ano
   `file` must respect `canSeeFinancial`.
 - Gate approval request = `POST …/gates/:gateId/request` → sets `requested_at`, emits `gate.approval_requested`;
   slice 7 turns events into e-mail.
-- Closed tenders (`submitted`, `no_go`, `cancelled`) are read-only for everything except lessons and files.
+- Closed tenders (`submitted`, `no_go`, `cancelled`) are read-only for everything except lessons and files; every
+  module answers a refused write with **422 `tender_closed`**.
 - Error codes are specific snake_case strings; the web translates them via `errorCodes.<code>` in the feature's own
   i18n namespace.

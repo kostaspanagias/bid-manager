@@ -106,12 +106,12 @@ export type FileConfidentiality = (typeof FILE_CONFIDENTIALITIES)[number];
 
 /**
  * A user as returned by GET /api/users: for admin / bid manager every active user, for everyone else only the
- * people they share a tender with. `email` is null for a viewer (except their own).
+ * people they share a tender with.
  */
 export interface UserRef {
   id: ID;
   name: string;
-  email: string | null;
+  email: string;
   org_role: OrgRole;
 }
 

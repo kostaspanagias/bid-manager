@@ -6,7 +6,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { badRequest, HttpError, unprocessable } from '../../core/errors.js';
 import { isMutating, zUuid } from '../../core/http.js';
-import { requireRole, seesUserEmails, visibleUserIds } from '../../core/permissions.js';
+import { requireRole, visibleUserIds } from '../../core/permissions.js';
 import { REQUIREMENT_STATUSES, REQUIREMENT_TYPES } from '../../domain/register.js';
 import { MAX_IMPORT_BYTES } from './importFile.js';
 import { IMPORT_FIELDS, REQUIREMENT_FOLDERS, type ExistingRow, type Mapping } from './importPlan.js';
@@ -146,11 +146,10 @@ router.get('/', async (req, res) => {
     loadOwners(db, tenderId),
     suggestNextCode(db, tenderId),
   ]);
-  // The picker's user list follows the directory rules (review M4): only people the caller shares a tender with,
-  // and no e-mail addresses for a viewer. (loadOwners itself stays complete: the import resolves owners with it.)
+  // The picker's user list follows the directory rule (review M4): only people the caller shares a tender with.
+  // (loadOwners itself stays complete: the import resolves owners with it.)
   const visible = await visibleUserIds(req.ctx);
-  const emails = seesUserEmails(req.ctx);
-  const users = owners.users.filter((u) => visible === null || visible.has(u.id)).map((u) => ({ ...u, email: emails ? u.email : null }));
+  const users = owners.users.filter((u) => visible === null || visible.has(u.id));
   res.json({ items, total: coverage.all.total, coverage, nextCode, owners: { roles: owners.roles, users } });
 });
 

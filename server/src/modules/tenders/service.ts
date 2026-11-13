@@ -95,15 +95,20 @@ export async function replaceMembers(db: ScopedDb, tender: Row, input: MemberInp
 
     const holders = new Map<string, string[]>();
     for (const m of members) if (m.role_key !== null) holders.set(m.role_key, [...(holders.get(m.role_key) ?? []), m.user_id]);
+    const onTeam = new Set(members.map((m) => m.user_id));
+    const managers = new Set((await tx.list<{ id: string }>('user', { org_role: ['admin', 'bid_manager'] })).map((u) => u.id));
     const gates = await tx.list('gate', { tender_id: tender.id, decision: 'pending' });
     for (const g of gates) {
       if (!g.approver_role_key) continue;
       const now = holders.get(g.approver_role_key) ?? [];
       const heldBefore = g.approver_user_id != null && have.has(idOf(g.approver_user_id, g.approver_role_key));
       const lostRole = heldBefore && !now.includes(g.approver_user_id);
-      if (g.approver_user_id == null || lostRole) {
+      // An approver picked by hand who is no longer on the team at all could never open the tender to decide
+      // (admins and bid managers reach every tender, so they may stay).
+      const leftTeam = g.approver_user_id != null && !onTeam.has(g.approver_user_id) && !managers.has(g.approver_user_id);
+      if (g.approver_user_id == null || lostRole || leftTeam) {
         const next = now[0] ?? null;
-        if (next !== g.approver_user_id) await tx.update('gate', g.id, { approver_user_id: next });
+        if (next !== g.approver_user_id) await tx.update('gate', g.id, { approver_user_id: next, requested_at: null, requested_by: null });
       }
     }
   });
