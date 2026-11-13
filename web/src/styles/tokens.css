@@ -1,0 +1,124 @@
+/*
+ * Design tokens — Bid Manager.
+ * Identity: "ink on paper". Warm paper background, dark ink navigation, one petrol accent.
+ * Colour is reserved for status: red = blocking, orange = warning, green = ok, blue = info.
+ * Everything in the UI kit and feature screens must use these variables, never raw hex values.
+ */
+:root {
+  color-scheme: light;
+
+  /* Type */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.8125rem; /* 13px */
+  --text-md: 0.875rem; /* 14px — body */
+  --text-lg: 1rem; /* 16px */
+  --text-xl: 1.25rem; /* 20px */
+  --text-2xl: 1.5rem; /* 24px */
+  --leading-tight: 1.25;
+  --leading-normal: 1.45;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-bold: 650;
+
+  /* Neutrals (warm) */
+  --c-bg: #f4f3ef;
+  --c-surface: #ffffff;
+  --c-surface-2: #faf9f6;
+  --c-surface-3: #efede7;
+  --c-border: #dedbd3;
+  --c-border-strong: #bfbbb0;
+  --c-text: #1b232d;
+  --c-text-muted: #56606c;
+  --c-text-faint: #7d8590;
+
+  /* Ink (navigation) */
+  --c-ink: #17212c;
+  --c-ink-2: #212d3a;
+  --c-ink-3: #2e3c4b;
+  --c-ink-text: #c5ced8;
+  --c-ink-text-strong: #ffffff;
+  --c-ink-text-faint: #8493a3;
+
+  /* Accent */
+  --c-primary: #14506b;
+  --c-primary-hover: #0e3f56;
+  --c-primary-active: #0a3346;
+  --c-primary-soft: #e2edf2;
+  --c-primary-contrast: #ffffff;
+  --c-link: #14506b;
+  --c-focus: #2a86b3;
+
+  /* Status — fg (text/icons), bg (tinted surface), border, solid (bars, dots) */
+  --c-red-fg: #9c1f14;
+  --c-red-bg: #fbeae7;
+  --c-red-border: #ecb4ac;
+  --c-red-solid: #c22d1e;
+
+  --c-orange-fg: #8a4705;
+  --c-orange-bg: #fcf0de;
+  --c-orange-border: #ebc48c;
+  --c-orange-solid: #d97c14;
+
+  --c-green-fg: #1a6640;
+  --c-green-bg: #e4f3ea;
+  --c-green-border: #a8d4bb;
+  --c-green-solid: #2b8a58;
+
+  --c-info-fg: #1c4d84;
+  --c-info-bg: #e6eff9;
+  --c-info-border: #b2cbe8;
+  --c-info-solid: #2f6fb5;
+
+  --c-neutral-fg: #48525e;
+  --c-neutral-bg: #eceae4;
+  --c-neutral-border: #d3d0c7;
+  --c-neutral-solid: #8a929c;
+
+  /* Space (4px grid) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* Shape */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgb(23 33 44 / 6%);
+  --shadow-md: 0 4px 14px rgb(23 33 44 / 10%), 0 1px 3px rgb(23 33 44 / 8%);
+  --shadow-lg: 0 18px 48px rgb(23 33 44 / 22%), 0 2px 8px rgb(23 33 44 / 10%);
+
+  /* Controls */
+  --control-h: 34px;
+  --control-h-sm: 28px;
+  --focus-ring: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-focus);
+
+  /* Layout */
+  --sidebar-w: 232px;
+  --topbar-h: 52px;
+  --content-max: 1360px;
+  --page-pad: var(--sp-6);
+
+  /* Layers */
+  --z-sticky: 10;
+  --z-nav: 40;
+  --z-popover: 60;
+  --z-modal: 80;
+  --z-toast: 100;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-pad: var(--sp-4);
+    --control-h: 40px;
+    --control-h-sm: 32px;
+  }
+}
