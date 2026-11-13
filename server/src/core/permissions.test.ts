@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { addMember, addRole, as, createOrg, createTender, createUser, dbFor, missingId, type TestUser } from '../test/harness.js';
+import { listApiRoutes } from '../app.js';
+import { addMember, addRole, as, createOrg, createTender, createUser, dbFor, missingId, type Agent, type TestUser } from '../test/harness.js';
 import { accessibleTenderIds, assertRole, canSeeFinancial, requireFinancialAccess, requireTenderAccess } from './permissions.js';
 import type { OrgRole } from './types.js';
 
@@ -155,38 +156,85 @@ describe('canSeeFinancial (R18)', () => {
 });
 
 describe('tender guard on /api/tenders/:tenderId/<module>', () => {
-  // The module routers are empty stubs, so a request that passes the guard falls through to the API 404
-  // ("Unknown API endpoint"); one that fails it gets the guard's own 403/404.
-  const PASSED = 'Unknown API endpoint';
+  // Every route under /api/tenders/:tenderId/… (and /api/tenders/:id/…), read from the routers themselves, so a
+  // route added later is covered without touching this test.
   const modules = ['gates', 'requirements', 'tasks', 'watch', 'risks', 'changes', 'files', 'documents', 'lessons', 'milestones'];
+  const tenderRoutes = listApiRoutes().filter((r) => /^\/api\/tenders\/:(tenderId|id)(\/|$)/.test(r.path));
+  const urlFor = (route: { path: string }, tenderId: string) =>
+    route.path.replace(/:(tenderId|id)(?=\/|$)/, tenderId).replace(/:\w+/g, () => missingId());
+  const call = (api: Agent, route: { method: string; path: string }, tenderId: string) => {
+    const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
+    const req = api[method](urlFor(route, tenderId));
+    return method === 'get' ? req : req.send({});
+  };
 
-  it('is applied to every tender-scoped module', async () => {
-    const { tender, u } = await scenario();
-    const outsider = await as(u.outsiderMember);
-    const member = await as(u.plainMember);
+  it('covers every tender-scoped module', () => {
     for (const m of modules) {
-      const denied = await outsider.get(`/api/tenders/${tender.id}/${m}`);
-      expect([m, denied.status, denied.body.error.code]).toEqual([m, 403, 'forbidden']);
-      const passed = await member.get(`/api/tenders/${tender.id}/${m}`);
-      expect([m, passed.status, passed.body.error.message]).toEqual([m, 404, PASSED]);
+      expect(tenderRoutes.some((r) => r.path.startsWith(`/api/tenders/:tenderId/${m}`)), m).toBe(true);
+    }
+    expect(tenderRoutes.length).toBeGreaterThanOrEqual(60);
+  });
+
+  it('a user of the org who is not a member of the tender gets 403 on every route, read or write', async () => {
+    const { tender, u } = await scenario();
+    for (const user of [u.outsiderMember, u.approverOutsider, u.viewerOutsider]) {
+      const api = await as(user);
+      for (const route of tenderRoutes) {
+        const res = await call(api, route, tender.id);
+        expect([route.method, route.path, res.status], JSON.stringify(res.body)).toEqual([route.method, route.path, 403]);
+        expect(res.body.error.code).toBe('forbidden');
+      }
     }
   });
 
-  it('viewers can read but not write; other orgs and unknown tenders get 404', async () => {
+  it('another organization, an unknown tender and a malformed id get 404 on every route — nothing reveals the tender exists', async () => {
+    const { tender, u } = await scenario();
+    const foreignOrg = await createOrg();
+    const foreignAdmin = await as(await createUser(foreignOrg, 'admin'));
+    const foreignMember = await as(await createUser(foreignOrg, 'member'));
+    const admin = await as(u.admin);
+    for (const route of tenderRoutes) {
+      // a foreign admin passes every role check, so only the org scope stands between them and the tender
+      const foreign = await call(foreignAdmin, route, tender.id);
+      expect([route.method, route.path, foreign.status], JSON.stringify(foreign.body)).toEqual([route.method, route.path, 404]);
+      // a foreign member is refused either as "not found" or by a role check — never served
+      const foreignLow = await call(foreignMember, route, tender.id);
+      expect([403, 404], `${route.method} ${route.path}`).toContain(foreignLow.status);
+      const unknown = await call(admin, route, missingId());
+      expect([route.method, route.path, unknown.status], JSON.stringify(unknown.body)).toEqual([route.method, route.path, 404]);
+      const malformed = await call(admin, route, 'not-a-uuid');
+      expect([route.method, route.path, malformed.status], JSON.stringify(malformed.body)).toEqual([route.method, route.path, 404]);
+    }
+  });
+
+  it('a viewer who is a member can read every list, and every mutating route refuses them', async () => {
     const { tender, u } = await scenario();
     const viewer = await as(u.viewerMember);
-    expect((await viewer.get(`/api/tenders/${tender.id}/tasks`)).body.error.message).toBe(PASSED);
-    for (const method of ['post', 'put', 'patch', 'delete'] as const) {
-      const res = await viewer[method](`/api/tenders/${tender.id}/tasks/x`).send({});
-      expect([method, res.status, res.body.error.code]).toEqual([method, 403, 'forbidden']);
+    for (const m of modules) {
+      const res = await viewer.get(`/api/tenders/${tender.id}/${m}`);
+      expect([m, res.status], JSON.stringify(res.body)).toEqual([m, 200]);
     }
-    const member = await as(u.plainMember);
-    expect((await member.post(`/api/tenders/${tender.id}/tasks`).send({})).body.error.message).toBe(PASSED);
+    expect((await viewer.get(`/api/tenders/${tender.id}`)).status).toBe(200);
+    const mutating = tenderRoutes.filter((r) => r.method !== 'GET');
+    expect(mutating.length).toBeGreaterThanOrEqual(40);
+    const before = await dbFor({ id: tender.org_id }).count('audit_log', { tender_id: tender.id });
+    for (const route of mutating) {
+      const res = await call(viewer, route, tender.id);
+      expect([route.method, route.path, res.status, res.body.error?.code], JSON.stringify(res.body)).toEqual([route.method, route.path, 403, 'forbidden']);
+    }
+    // nothing was written on the way to those refusals
+    expect(await dbFor({ id: tender.org_id }).count('audit_log', { tender_id: tender.id })).toBe(before);
+  });
 
-    const foreign = await as(await createUser(await createOrg(), 'admin'));
-    const res = await foreign.get(`/api/tenders/${tender.id}/files`);
-    expect([res.status, res.body.error.message]).toEqual([404, 'Tender not found']);
-    expect((await as(u.admin).get(`/api/tenders/${missingId()}/files`)).body.error.message).toBe('Tender not found');
-    expect((await as(u.admin).get('/api/tenders/not-a-uuid/files')).body.error.message).toBe('Tender not found');
+  it('a member passes the guard: requests reach the module (never the guard\'s 403/404)', async () => {
+    const { tender, u } = await scenario();
+    const member = await as(u.plainMember);
+    for (const m of modules) {
+      const res = await member.get(`/api/tenders/${tender.id}/${m}`);
+      expect([m, res.status], JSON.stringify(res.body)).toEqual([m, 200]);
+    }
+    // a write with an empty body reaches the module's own validation
+    const post = await member.post(`/api/tenders/${tender.id}/risks`).send({});
+    expect([post.status, post.body.error.code]).toEqual([400, 'validation_error']);
   });
 });

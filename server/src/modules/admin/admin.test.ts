@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { as, createOrg, createUser, dbFor, missingId } from '../../test/harness.js';
+import { testOutbox } from '../../core/mailer.js';
+import { anon, as, createOrg, createUser, dbFor, missingId } from '../../test/harness.js';
 
 describe('/api/admin/users', () => {
   it('admin lists the users of the own org only, without secrets', async () => {
@@ -120,6 +121,87 @@ describe('/api/admin/users', () => {
     expect(JSON.stringify((await foreign.get('/api/admin/users')).body)).not.toContain(victim.id);
     expect(JSON.stringify((await foreign.get('/api/users')).body)).not.toContain(victim.id);
     expect(await dbFor(orgA).get('user', victim.id)).toMatchObject({ org_role: 'member', active: true, name: 'Victim' });
+  });
+});
+
+describe('POST /api/admin/users/:id/reset-password', () => {
+  const PASSWORD = 'a long enough password';
+  const tokenOf = (url: string) => decodeURIComponent(url.split('/reset/')[1]!);
+
+  it('admin only; ends the sessions, kills the old password and issues a single-use link — never a password', async () => {
+    const org = await createOrg();
+    const admin = await createUser(org, 'admin');
+    const user = await createUser(org, 'member', { password: PASSWORD });
+    const session = await as(user);
+    expect((await session.get('/api/auth/me')).status).toBe(200);
+    for (const role of ['bid_manager', 'member', 'approver', 'viewer'] as const) {
+      expect((await as(await createUser(org, role)).post(`/api/admin/users/${user.id}/reset-password`)).status).toBe(403);
+    }
+    testOutbox.length = 0;
+    const res = await as(admin).post(`/api/admin/users/${user.id}/reset-password`);
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ user: { id: user.id }, expiresInHours: 24, emailSent: true });
+    expect(res.body.resetUrl).toMatch(/\/reset\/[\w-]{20,}$/);
+    const token = tokenOf(res.body.resetUrl);
+    // sessions gone, old password dead, only the hash of the token stored, nothing secret in audit or mail
+    expect((await session.get('/api/auth/me')).status).toBe(401);
+    expect((await anon().post('/api/auth/login').send({ email: user.email, password: PASSWORD })).status).toBe(401);
+    const rows = await dbFor(org).list('password_reset', { user_id: user.id });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].token_hash).not.toBe(token);
+    expect(JSON.stringify(rows)).not.toContain(token);
+    expect(JSON.stringify(await dbFor(org).list('audit_log', { entity_id: user.id }))).not.toContain(token);
+    expect(testOutbox).toHaveLength(1);
+    expect(testOutbox[0]).toMatchObject({ to: user.email });
+    expect(testOutbox[0]!.text).toContain(res.body.resetUrl);
+
+    // the link: info, then set a password once
+    const info = await anon().post('/api/auth/reset-info').send({ token });
+    expect([info.status, info.body.email]).toEqual([200, user.email]);
+    expect((await anon().post('/api/auth/reset-password').send({ token, password: 'short' })).status).toBe(400);
+    const set = await anon().post('/api/auth/reset-password').send({ token, password: 'a brand new password' });
+    expect([set.status, set.body.ok]).toEqual([200, true]);
+    const again = await anon().post('/api/auth/reset-password').send({ token, password: 'yet another password' });
+    expect([again.status, again.body.error.code]).toEqual([404, 'reset_invalid']);
+    expect((await anon().post('/api/auth/reset-info').send({ token })).status).toBe(404);
+    // new password works and still needs the second factor (TOTP untouched)
+    const login = await anon().post('/api/auth/login').send({ email: user.email, password: 'a brand new password' });
+    expect([login.status, login.body.stage]).toEqual([200, 'totp']);
+    expect((await anon().post('/api/auth/login').send({ email: user.email, password: PASSWORD })).status).toBe(401);
+    const actions = (await dbFor(org).list('audit_log', { entity_id: user.id })).map((a) => a.action);
+    expect(actions).toEqual(expect.arrayContaining(['password_reset_requested', 'password_reset_completed']));
+  });
+
+  it('a new link revokes the previous one; expired links, inactive users and unknown ids are refused', async () => {
+    const org = await createOrg();
+    const api = await as(await createUser(org, 'admin'));
+    const user = await createUser(org, 'member', { password: PASSWORD });
+    const first = tokenOf((await api.post(`/api/admin/users/${user.id}/reset-password`)).body.resetUrl);
+    const second = tokenOf((await api.post(`/api/admin/users/${user.id}/reset-password`)).body.resetUrl);
+    expect((await anon().post('/api/auth/reset-info').send({ token: first })).status).toBe(404);
+    expect((await anon().post('/api/auth/reset-info').send({ token: second })).status).toBe(200);
+    await dbFor(org).sql("UPDATE password_reset SET expires_at = now() - interval '1 minute' WHERE org_id = :org_id AND user_id = :id", { id: user.id });
+    const expired = await anon().post('/api/auth/reset-password').send({ token: second, password: 'a brand new password' });
+    expect([expired.status, expired.body.error.code]).toEqual([404, 'reset_invalid']);
+
+    const inactive = await createUser(org, 'member', { active: false });
+    const res = await api.post(`/api/admin/users/${inactive.id}/reset-password`);
+    expect([res.status, res.body.error.code]).toEqual([422, 'user_inactive']);
+    expect((await api.post(`/api/admin/users/${missingId()}/reset-password`)).status).toBe(404);
+    // a link stops working when the user is deactivated afterwards
+    const later = await createUser(org, 'member', { password: PASSWORD });
+    const token = tokenOf((await api.post(`/api/admin/users/${later.id}/reset-password`)).body.resetUrl);
+    await api.patch(`/api/admin/users/${later.id}`).send({ active: false });
+    expect((await anon().post('/api/auth/reset-password').send({ token, password: 'a brand new password' })).status).toBe(404);
+  });
+
+  it('cross-org: an admin cannot reset a user of another organization', async () => {
+    const orgA = await createOrg();
+    const victim = await createUser(orgA, 'member', { password: PASSWORD });
+    const foreign = await as(await createUser(await createOrg(), 'admin'));
+    expect((await foreign.post(`/api/admin/users/${victim.id}/reset-password`)).status).toBe(404);
+    expect(await dbFor(orgA).count('password_reset', {})).toBe(0);
+    expect((await anon().post('/api/auth/login').send({ email: victim.email, password: PASSWORD })).status).toBe(200);
   });
 });
 

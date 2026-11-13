@@ -8,7 +8,6 @@ import { enumLabel } from '@/lib/enums';
 import { Banner, Button, Card, Field, Input, PageHeader, useToast } from '@/ui';
 import { changePassword } from './accountApi';
 import './account.css';
-import './i18n';
 
 /** /account — the user's own details and password change. */
 export function AccountPage() {

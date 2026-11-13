@@ -139,6 +139,7 @@ export async function executeErasure(db: ScopedDb, target: Target, plan: ErasePl
       // Whether or not the row was already anonymised: no session, invitation or stored e-mail text may remain.
       await tx.sql('DELETE FROM session WHERE org_id = :org_id AND user_id = :id', { id: user.id });
       await tx.sql('DELETE FROM invitation WHERE org_id = :org_id AND (email = :email OR accepted_user_id = :id)', { id: user.id, email: user.email });
+      await tx.sql('DELETE FROM password_reset WHERE org_id = :org_id AND user_id = :id', { id: user.id });
       await tx.sql(`UPDATE email_log SET to_email = NULL, subject = '', body = '' WHERE org_id = :org_id AND (user_id = :id OR to_email = :email)`, {
         id: user.id,
         email: user.email,

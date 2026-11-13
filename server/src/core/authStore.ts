@@ -2,8 +2,8 @@
 // UNSCOPED QUERIES — the only file outside src/db/ that may import the pg pool (enforced by
 // src/test/poolImports.test.ts).
 //
-// These three lookups run BEFORE an organization is known (the caller only has an e-mail, a session cookie or an
-// invitation token), so they cannot go through scopedDb(). Each one only identifies the row and its org_id; all
+// These four lookups run BEFORE an organization is known (the caller only has an e-mail, a session cookie, an
+// invitation token or a password-reset token), so they cannot go through scopedDb(). Each one only identifies the row and its org_id; all
 // further reads and writes are done through scopedDb(row.org_id, …). Do not add queries here for any other reason.
 // =================================================================================================================
 import { getPool } from '../db/pool.js';
@@ -101,4 +101,18 @@ export async function findInvitationByTokenHash(tokenHash: string): Promise<Invi
     [tokenHash],
   );
   return (rows[0] as InvitationRow | undefined) ?? null;
+}
+
+export interface PasswordResetRow {
+  id: string;
+  org_id: string;
+  user_id: string;
+  expires_at: Date;
+  used_at: Date | null;
+}
+
+/** Password-reset token (hashed) → reset row. */
+export async function findPasswordResetByTokenHash(tokenHash: string): Promise<PasswordResetRow | null> {
+  const { rows } = await getPool().query('SELECT id, org_id, user_id, expires_at, used_at FROM password_reset WHERE token_hash = $1', [tokenHash]);
+  return (rows[0] as PasswordResetRow | undefined) ?? null;
 }

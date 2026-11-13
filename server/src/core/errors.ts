@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { ZodError } from 'zod';
-import { logger } from './logger.js';
+import { reportError } from './errorTracking.js';
 
 /** Throw from anywhere in a request: becomes `{ error: { code, message, details? } }` with the given status. */
 export class HttpError extends Error {
@@ -73,13 +73,32 @@ export function toErrorResponse(err: unknown): { status: number; body: ErrorBody
       return pg(400, 'validation_error', 'A value has an invalid format');
     }
   }
+  // http-errors thrown by express itself (static files, malformed URLs, range errors): keep their 4xx status
+  const httpStatus = typeof e.status === 'number' ? e.status : e.statusCode;
+  if (typeof httpStatus === 'number' && httpStatus >= 400 && httpStatus < 500) {
+    const notFoundStatus = httpStatus === 404;
+    return {
+      status: httpStatus,
+      body: { error: { code: notFoundStatus ? 'not_found' : 'bad_request', message: notFoundStatus ? 'Not found' : 'Bad request' } },
+      expose: true,
+    };
+  }
   return { status: 500, body: { error: { code: 'internal_error', message: 'Internal server error' } }, expose: false };
 }
 
 export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   if (res.headersSent) return next(err);
   const { status, body, expose } = toErrorResponse(err);
-  if (!expose) (req.log ?? logger).error({ err }, 'unhandled error');
+  if (!expose) {
+    reportError(err, {
+      source: 'http',
+      requestId: String(req.id ?? ''),
+      method: req.method,
+      path: String(req.originalUrl ?? req.url).split('?')[0],
+      orgId: req.ctx?.orgId,
+      userId: req.ctx?.user.id,
+    });
+  }
   res.status(status).json(body);
 };
 

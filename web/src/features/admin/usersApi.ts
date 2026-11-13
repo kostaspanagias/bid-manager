@@ -5,6 +5,8 @@
  *   PATCH  /api/admin/users/:id             { org_role?, active?, name? } → the user. "deactivate" = { active: false }
  *                                           422 self_change / last_admin
  *   POST   /api/admin/users/:id/reset-totp  → the user (2FA cleared, sessions ended)
+ *   POST   /api/admin/users/:id/reset-password → 201 { user, resetUrl, expiresInHours, emailSent } (link shown once;
+ *                                           password dead and sessions ended at once; 422 user_inactive)
  *   GET    /api/admin/invitations           → { items: [{ id, email, org_role, status, expires_at, accepted_at, created_at }] }
  *   POST   /api/admin/invitations           { email, org_role } → 201 { invitation, token, acceptUrl, emailSent }
  *                                           (token in clear only here; 409 user_exists)
@@ -40,6 +42,26 @@ export async function listAdminUsers(): Promise<AdminUser[]> {
 /** Lost authenticator: the user enrols TOTP again at the next login. */
 export function resetUserTotp(id: ID): Promise<unknown> {
   return api.post(`/admin/users/${id}/reset-totp`);
+}
+
+export interface PasswordResetLink {
+  email: string;
+  /** Single-use link on the origin the admin is using right now */
+  resetUrl: string;
+  expiresInHours: number;
+  emailSent: boolean;
+}
+
+/** Forgotten password: issues a single-use set-password link. No password is ever shown or e-mailed. */
+export async function resetUserPassword(user: AdminUser): Promise<PasswordResetLink> {
+  const raw = await api.post<{ resetUrl: string; expiresInHours: number; emailSent: boolean }>(`/admin/users/${user.id}/reset-password`);
+  const token = raw.resetUrl.split('/reset/')[1] ?? '';
+  return {
+    email: user.email,
+    resetUrl: token ? `${window.location.origin}/reset/${token}` : raw.resetUrl,
+    expiresInHours: raw.expiresInHours,
+    emailSent: raw.emailSent,
+  };
 }
 
 export function updateAdminUser(id: ID, patch: { org_role?: OrgRole; active?: boolean }): Promise<unknown> {

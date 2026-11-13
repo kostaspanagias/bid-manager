@@ -15,7 +15,7 @@ export interface LoginLocationState {
   /** Where to go after login */
   from?: string;
   /** Why the login screen is shown */
-  notice?: 'expired' | 'loggedOut' | 'inviteAccepted';
+  notice?: 'expired' | 'loggedOut' | 'inviteAccepted' | 'passwordReset';
   /** Prefill (after accepting an invitation) */
   email?: string;
 }
@@ -53,7 +53,7 @@ export function LoginPage() {
         </Banner>
       )}
       {notice && !ended && (
-        <Banner tone={notice === 'expired' ? 'orange' : notice === 'inviteAccepted' ? 'green' : 'info'} className="auth__notice">
+        <Banner tone={notice === 'expired' ? 'orange' : notice === 'inviteAccepted' || notice === 'passwordReset' ? 'green' : 'info'} className="auth__notice">
           {t(`login.${notice}`)}
         </Banner>
       )}

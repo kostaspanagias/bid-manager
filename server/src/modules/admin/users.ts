@@ -1,8 +1,12 @@
 // Mounted at /api/admin/users — admin only.
 import { Router } from 'express';
 import { z } from 'zod';
+import { config } from '../../config.js';
 import { endAllSessionsOf } from '../../core/auth.js';
+import { randomToken, sha256Hex } from '../../core/crypto.js';
 import { notFound, unprocessable } from '../../core/errors.js';
+import { logger } from '../../core/logger.js';
+import { sendMail } from '../../core/mailer.js';
 import { requireRole } from '../../core/permissions.js';
 import { ORG_ROLES, type Ctx } from '../../core/types.js';
 import type { Row } from '../../db/scoped.js';
@@ -69,4 +73,53 @@ router.post('/:id/reset-totp', async (req, res) => {
   if (!updated) throw notFound('User not found');
   if (updated.id !== ctx.user.id) await endAllSessionsOf(ctx.orgId, updated.id);
   res.json(view(updated));
+});
+
+export const PASSWORD_RESET_HOURS = 24;
+
+/**
+ * Forgotten password: the admin issues a single-use set-password link (valid 24 h), exactly like an invitation.
+ * No password is ever generated, shown or e-mailed. The current password stops working at once, every session of
+ * the user ends, and earlier unused links are revoked. 2FA is untouched (use reset-totp for a lost authenticator).
+ */
+router.post('/:id/reset-password', async (req, res) => {
+  const { ctx } = req;
+  const token = randomToken(32);
+  const user = await ctx.db.tx(async (db) => {
+    const u = await db.get('user', String(req.params.id));
+    if (!u) throw notFound('User not found');
+    if (u.active !== true || u.anonymized_at) throw unprocessable('Only an active user can get a password-reset link', undefined, 'user_inactive');
+    await db.sql('DELETE FROM password_reset WHERE org_id = :org_id AND user_id = :id AND used_at IS NULL', { id: u.id });
+    await db.sql('UPDATE "user" SET password_hash = NULL, failed_login_count = 0, locked_until = NULL WHERE org_id = :org_id AND id = :id', { id: u.id });
+    await db.sql(
+      `INSERT INTO password_reset (org_id, user_id, token_hash, expires_at, created_by)
+       VALUES (:org_id, :id, :token_hash, :expires_at, :created_by)`,
+      { id: u.id, token_hash: sha256Hex(token), expires_at: new Date(Date.now() + PASSWORD_RESET_HOURS * 3_600_000), created_by: ctx.user.id },
+    );
+    await db.sql('DELETE FROM session WHERE org_id = :org_id AND user_id = :id', { id: u.id });
+    await db.audit('user', u.id, 'password_reset_requested', { after: { expires_in_hours: PASSWORD_RESET_HOURS } });
+    return u;
+  });
+  // The web app's route for setting the new password is /reset/:token.
+  const resetUrl = `${config.appUrl}/reset/${encodeURIComponent(token)}`;
+  let emailSent = true;
+  try {
+    await sendMail({
+      to: user.email,
+      subject: 'Επαναφορά κωδικού στο Bid Manager',
+      text: [
+        `Ο/Η ${ctx.user.name} ζήτησε επαναφορά του κωδικού σας στο Bid Manager.`,
+        '',
+        `Ορίστε νέο κωδικό εδώ (ο σύνδεσμος ισχύει ${PASSWORD_RESET_HOURS} ώρες και χρησιμοποιείται μία φορά):`,
+        resetUrl,
+        '',
+        'Ο προηγούμενος κωδικός δεν ισχύει πλέον. Ο έλεγχος δύο παραγόντων δεν αλλάζει.',
+      ].join('\n'),
+    });
+  } catch (err) {
+    emailSent = false;
+    logger.error({ err }, 'password-reset e-mail failed');
+  }
+  // The token is returned exactly once (only its hash is stored) so the admin can also pass the link on by hand.
+  res.status(201).json({ user: view(user), resetUrl, expiresInHours: PASSWORD_RESET_HOURS, emailSent });
 });

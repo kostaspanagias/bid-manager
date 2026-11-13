@@ -1,5 +1,6 @@
 import { createApp } from './app.js';
 import { config } from './config.js';
+import { reportError } from './core/errorTracking.js';
 import { logger } from './core/logger.js';
 import { closeDatabase } from './db/admin.js';
 import { startJobs, stopJobs } from './jobs/index.js';
@@ -10,6 +11,13 @@ const server = app.listen(config.port, () => {
 });
 
 startJobs().catch((err: unknown) => logger.error({ err }, 'failed to start jobs'));
+
+// Last line of defence: nothing should reach these, but if it does it must be visible in error tracking.
+process.on('unhandledRejection', (reason) => reportError(reason, { source: 'process', kind: 'unhandledRejection' }));
+process.on('uncaughtException', (err) => {
+  reportError(err, { source: 'process', kind: 'uncaughtException' });
+  void shutdown('uncaughtException');
+});
 
 let closing = false;
 async function shutdown(signal: string): Promise<void> {

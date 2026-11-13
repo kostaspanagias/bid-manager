@@ -23,6 +23,8 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
+      /** Request id (set first thing in app.ts; reused by the access log and error tracking). */
+      id?: string | number | object;
       /** Set by requireAuth on every route behind it (everything except /api/health and /api/auth/*). */
       ctx: Ctx;
       /** Set by the tender guard on /api/tenders/:tenderId/<module> routes. */

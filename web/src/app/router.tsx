@@ -10,6 +10,7 @@ import { UsersPage } from '@/features/admin/UsersPage';
 import { AcceptInvitePage } from '@/features/auth/AcceptInvitePage';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { ChangesTab } from '@/features/changes/ChangesTab';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { CompanyDocumentsPage } from '@/features/documents/CompanyDocumentsPage';
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/invite/:token', element: <AcceptInvitePage /> },
+      { path: '/reset/:token', element: <ResetPasswordPage /> },
       { path: '/accept-invite', element: <AcceptInvitePage /> }, // ?token=… — the link format in the server's e-mail
       {
         element: (

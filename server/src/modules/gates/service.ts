@@ -77,7 +77,7 @@ type GateCtx = Pick<Ctx, 'user' | 'db'>;
 export const isClosed = (tender: Row): boolean => CLOSED_STATUSES.includes(String(tender.status));
 
 function assertOpen(tender: Row): void {
-  if (isClosed(tender)) throw conflict('The tender is closed and read-only', undefined, 'tender_closed');
+  if (isClosed(tender)) throw unprocessable('The tender is closed and read-only', undefined, 'tender_closed');
 }
 
 async function buildViews(ctx: GateCtx, tender: Row, gates: Row[]): Promise<GateView[]> {

@@ -42,6 +42,12 @@ const schema = z
     SMTP_USER: opt(z.string()),
     SMTP_PASS: opt(z.string()),
     SMTP_FROM: z.preprocess(emptyToUndefined, z.string().default('Bid Manager <no-reply@example.com>')),
+    /** Directory of the built SPA (web/dist). Served by this process when it exists; set to `off` to disable. */
+    WEB_DIST_DIR: opt(z.string()),
+    /** Optional URL that receives unhandled errors as JSON POSTs (see core/errorTracking.ts). */
+    ERROR_TRACKING_DSN: opt(z.string().url()),
+    /** Optional version label attached to error events (e.g. a git SHA). */
+    RELEASE: opt(z.string().max(100)),
     LOG_LEVEL: opt(z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])),
   })
   .superRefine((env, ctx) => {
@@ -83,6 +89,13 @@ export const config = {
     pass: env.SMTP_PASS,
     from: env.SMTP_FROM,
   },
+  /**
+   * Where the built web app lives. Default: <repo>/web/dist (the same relative path from src/ and from dist/).
+   * Never served under NODE_ENV=test unless a test passes a directory to createApp(); `off` disables it.
+   */
+  webDistDir: env.WEB_DIST_DIR === 'off' ? null : (env.WEB_DIST_DIR ?? fileURLToPath(new URL('../../web/dist', import.meta.url))),
+  errorTrackingDsn: env.ERROR_TRACKING_DSN ?? null,
+  release: env.RELEASE ?? null,
   logLevel: env.LOG_LEVEL ?? (env.NODE_ENV === 'test' ? 'silent' : 'info'),
 } as const;
 

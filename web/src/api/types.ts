@@ -98,23 +98,11 @@ export const FILE_CONFIDENTIALITIES = ['normal', 'financial'] as const;
 export type FileConfidentiality = (typeof FILE_CONFIDENTIALITIES)[number];
 
 /* --------------------------------------------------------------- entities */
-
-/** Columns every table has. */
-export interface BaseEntity {
-  id: ID;
-  org_id: ID;
-  created_at: Timestamp;
-  updated_at: Timestamp;
-  created_by: ID | null;
-}
-
-export interface Organization {
-  id: ID;
-  name: string;
-  timezone: string;
-  settings?: Json;
-  retention_days?: number | null;
-}
+//
+// Only the entities that several features share, exactly as the server sends them. Everything else — templates and
+// their items, gates and criteria, milestones, tasks, watch items, risks, files, company documents, lessons, team —
+// is typed next to the endpoint that returns it, in the feature's own *Api.ts (the server returns joined/computed
+// views there, not table rows).
 
 /** Minimal user as returned by GET /api/users and embedded in other payloads. */
 export interface UserRef {
@@ -124,71 +112,56 @@ export interface UserRef {
   org_role: OrgRole;
 }
 
-export interface User extends BaseEntity, UserRef {
-  active: boolean;
-  totp_enabled_at: Timestamp | null;
-  last_login_at: Timestamp | null;
-}
-
-export interface Invitation extends BaseEntity {
+/** GET /api/admin/invitations item (the token is never returned after creation). */
+export interface Invitation {
+  id: ID;
   email: string;
   org_role: OrgRole;
+  status: 'pending' | 'accepted' | 'expired';
   expires_at: Timestamp;
   accepted_at: Timestamp | null;
+  created_at: Timestamp;
 }
 
-export interface Holiday extends BaseEntity {
+/** GET /api/holidays item. */
+export interface Holiday {
+  id: ID;
   date: DateString;
   name: string;
   source: HolidaySource;
 }
 
-export interface Template extends BaseEntity {
-  name: string;
-  version: string;
-  status: TemplateStatus;
-  parent_template_id: ID | null;
-}
-
-export interface TemplateItem extends BaseEntity {
-  template_id: ID;
-  kind: TemplateItemKind;
-  key: string;
-  name: string;
-  owner_role_key: string | null;
-  /** Signed: anchor 'T' + −8 = T−8; anchor 'T0' + 3 = T0+3; anchor 'G0' + 2 = G0+2. */
-  offset_value: number | null;
-  offset_unit: OffsetUnit | null;
-  /** 'T' | 'T0' | key of another item */
-  anchor: string | null;
-  condition: TemplateCondition;
-  sort: number;
-  payload: Json;
-}
-
 export interface TenderLot {
-  no?: string | number;
-  title?: string;
-  budget_net?: number | string | null;
-  [key: string]: Json | undefined;
+  no?: string | number | null;
+  title: string;
+  budget_net?: number | null;
+  budget_gross?: number | null;
 }
 
-export interface Tender extends BaseEntity {
+/**
+ * The tender record as sent by /api/tenders (server: tenders/service.ts `tenderView`): every column except the
+ * template snapshot, plus `template_name`. Numeric columns arrive as JS numbers.
+ */
+export interface Tender {
+  id: ID;
+  org_id: ID;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  created_by: ID | null;
   title: string;
   authority: string;
   adam: string | null;
   esidis_no: string | null;
   cpv: string[];
-  /** numeric columns arrive as strings from pg unless the server converts them */
-  budget_net: number | string | null;
-  budget_gross: number | string | null;
+  budget_net: number | null;
+  budget_gross: number | null;
   lots: TenderLot[] | null;
   /** T0 */
   t0_published_at: Timestamp | null;
   questions_deadline_at: Timestamp | null;
   /** T (date + time) */
   submission_deadline_at: Timestamp;
-  guarantee_amount: number | string | null;
+  guarantee_amount: number | null;
   guarantee_valid_until: DateString | null;
   guarantee_margin_days: number;
   offer_validity_days: number | null;
@@ -196,61 +169,17 @@ export interface Tender extends BaseEntity {
   has_partners: boolean;
   status: TenderStatus;
   compressed_mode: boolean;
+  notes: string | null;
   template_id: ID | null;
   template_version: string | null;
+  /** name of the template the tender was created from (from its snapshot) */
+  template_name: string | null;
   closed_at: Timestamp | null;
 }
 
-/** Per-tender snapshot of a template role (e.g. «Δικαιολογητικά», «Τεχνική», «Οικονομική»). */
-export interface TenderRole extends BaseEntity {
-  tender_id: ID;
-  key: string;
-  name: string;
-  payload: { folder?: RequirementFolder; financial?: boolean; [key: string]: Json | undefined };
-}
-
-export interface TenderMember extends BaseEntity {
-  tender_id: ID;
-  user_id: ID;
-  tender_role_key: string | null;
-}
-
-export interface Milestone extends BaseEntity {
-  tender_id: ID;
-  key: string;
-  name: string;
-  kind: MilestoneKind;
-  due_date: DateString;
-  computed_from: Json;
-  is_manual: boolean;
-  needs_review: boolean;
-  done_at: Timestamp | null;
-  sort: number;
-}
-
-export interface Gate extends BaseEntity {
-  tender_id: ID;
-  milestone_id: ID;
-  approver_user_id: ID | null;
-  decision: GateDecision;
-  justification: string | null;
-  decided_by: ID | null;
-  decided_at: Timestamp | null;
-  requested_at: Timestamp | null;
-}
-
-export interface GateCriterion extends BaseEntity {
-  gate_id: ID;
-  key: string | null;
-  text: string;
-  type: CriterionType;
-  auto_rule: AutoRule | null;
-  checked_by: ID | null;
-  checked_at: Timestamp | null;
-  sort: number;
-}
-
-export interface Requirement extends BaseEntity {
+/** A register row as stored (GET …/requirements adds owner role and linked changes — see requirementsApi.ts). */
+export interface Requirement {
+  id: ID;
   tender_id: ID;
   /** ΥΠ-nnn, unique per tender */
   code: string;
@@ -264,98 +193,24 @@ export interface Requirement extends BaseEntity {
   evidence_ref: string | null;
   status: RequirementStatus;
   deviation_note: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
-export interface Task extends BaseEntity {
-  tender_id: ID;
-  milestone_id: ID | null;
-  title: string;
-  owner_user_id: ID | null;
-  owner_role_key: string | null;
-  due_date: DateString | null;
-  status: TaskStatus;
-  section: TaskSection;
-  handoff_from_role: string | null;
-  handoff_to_role: string | null;
-  received_by: ID | null;
-  received_at: Timestamp | null;
-  done_at: Timestamp | null;
-  sort: number;
-}
-
-export interface WatchItem extends BaseEntity {
-  tender_id: ID;
-  name: string;
-  owner_user_id: ID | null;
-  lead_value: number | null;
-  lead_unit: OffsetUnit | null;
-  needed_at: DateString | null;
-  needed_milestone_key: string | null;
-  checks: string | null;
-  requested_at: DateString | null;
-  expected_at: DateString | null;
-  arrived_at: DateString | null;
-  notes: string | null;
-}
-
-export interface Risk extends BaseEntity {
-  tender_id: ID;
-  title: string;
-  trigger: string | null;
-  mitigation: string | null;
-  owner_user_id: ID | null;
-  status: RiskStatus;
-}
-
-export interface ChangeEntry extends BaseEntity {
+/** A change-log entry as returned by the change log and by the deadline flow (kind `extension`). */
+export interface ChangeEntry {
+  id: ID;
   tender_id: ID;
   date: DateString;
   source: ChangeSource;
   kind: ChangeKind;
   description: string;
+  reference?: string | null;
   owner_user_id?: ID | null;
-  /** ids of affected register rows (m2m change_entry_requirement), when the endpoint includes them */
-  requirement_ids?: ID[];
-}
-
-export interface CompanyDocument extends BaseEntity {
-  type: CompanyDocumentType;
-  title: string;
-  file_id: ID | null;
-  issued_at: DateString | null;
-  expires_at: DateString | null;
-  /** for CVs */
-  person_name: string | null;
-}
-
-export interface TenderDocument extends BaseEntity {
-  tender_id: ID;
-  company_document_id: ID;
-}
-
-export interface FileRecord extends BaseEntity {
-  tender_id: ID | null;
-  filename: string;
-  mime: string;
-  size: number;
-  sha256: string;
-  folder: FileFolder;
-  confidentiality: FileConfidentiality;
-  uploaded_by: ID | null;
-  deleted_at: Timestamp | null;
-}
-
-export interface Lesson extends BaseEntity {
-  tender_id: ID;
-  text: string;
-  category: string | null;
-  changes_template: boolean;
-  applied_in_version: string | null;
 }
 
 export interface AuditLogEntry {
   id: ID;
-  org_id?: ID;
   user_id: ID | null;
   entity: string;
   entity_id: ID | null;

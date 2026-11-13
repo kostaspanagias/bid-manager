@@ -1,4 +1,4 @@
-import { logger } from './logger.js';
+import { reportError } from './errorTracking.js';
 import type { Ctx } from './types.js';
 
 /** Every event of the in-process bus and its payload. Add new events here. */
@@ -35,7 +35,7 @@ export function emit<N extends EventName>(ctx: EventCtx, name: N, payload: AppEv
   for (const handler of [...set]) {
     const run = new Promise<void>((resolve) => setImmediate(resolve))
       .then(() => handler({ orgId: ctx.orgId, user: ctx.user, db: ctx.db }, payload))
-      .catch((err: unknown) => logger.error({ err, event: name }, 'event handler failed'))
+      .catch((err: unknown) => reportError(err, { source: 'event', event: name, orgId: ctx.orgId }))
       .finally(() => pending.delete(run));
     pending.add(run);
   }

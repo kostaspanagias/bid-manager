@@ -35,11 +35,13 @@ import {
   invitationState,
   listAdminUsers,
   listInvitations,
+  resetUserPassword,
   resetUserTotp,
   updateAdminUser,
   type AdminUser,
   type CreatedInvitation,
   type InvitationState,
+  type PasswordResetLink,
 } from './usersApi';
 import './admin.css';
 
@@ -124,6 +126,8 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
   const [roleFor, setRoleFor] = useState<AdminUser | null>(null);
   const [deactivate, setDeactivate] = useState<AdminUser | null>(null);
   const [resetFor, setResetFor] = useState<AdminUser | null>(null);
+  const [passwordFor, setPasswordFor] = useState<AdminUser | null>(null);
+  const [resetLink, setResetLink] = useState<PasswordResetLink | null>(null);
 
   const invalidate = () =>
     Promise.all([
@@ -150,6 +154,26 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
+
+  const resetPassword = useMutation({
+    mutationFn: (user: AdminUser) => resetUserPassword(user),
+    onSuccess: async (link) => {
+      await invalidate();
+      setPasswordFor(null);
+      setResetLink(link);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+
+  const copyResetLink = async () => {
+    if (!resetLink) return;
+    try {
+      await navigator.clipboard.writeText(resetLink.resetUrl);
+      toast.success(t('invitations.linkCopied'));
+    } catch {
+      toast.error(t('invitations.copyFailed'));
+    }
+  };
 
   const rows = useMemo(() => {
     const q = search.trim().toLocaleLowerCase('el');
@@ -216,6 +240,7 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
             disabled={u.id === me?.id}
             items={[
               { label: t('users.changeRole'), icon: 'edit', onSelect: () => setRoleFor(u) },
+              u.active && { label: t('users.resetPassword'), icon: 'lock', onSelect: () => setPasswordFor(u) },
               u.totp_enabled && { label: t('users.resetTotp'), icon: 'shield', onSelect: () => setResetFor(u) },
               u.active
                 ? { label: t('users.deactivate'), icon: 'block', danger: true, separatorBefore: true, onSelect: () => setDeactivate(u) }
@@ -254,6 +279,42 @@ function UsersTable({ users, loading, error, onRetry }: UsersTableProps) {
         onCancel={() => setResetFor(null)}
         onConfirm={() => resetFor && resetTotp.mutate(resetFor)}
       />
+      <ConfirmDialog
+        open={passwordFor !== null}
+        title={t('users.resetPasswordTitle')}
+        message={passwordFor ? t('users.resetPasswordMessage', { name: passwordFor.name, hours: 24 }) : null}
+        confirmLabel={t('users.resetPassword')}
+        loading={resetPassword.isPending}
+        onCancel={() => setPasswordFor(null)}
+        onConfirm={() => passwordFor && resetPassword.mutate(passwordFor)}
+      />
+      <Modal
+        open={resetLink !== null}
+        onClose={() => setResetLink(null)}
+        closeOnBackdrop={false}
+        title={t('users.resetPasswordDone')}
+        footer={
+          <Button variant="primary" onClick={() => setResetLink(null)}>
+            {t('common:actions.close')}
+          </Button>
+        }
+      >
+        {resetLink && (
+          <div className="u-stack">
+            <Banner tone={resetLink.emailSent ? 'green' : 'orange'}>
+              {t(resetLink.emailSent ? 'users.resetPasswordEmailSent' : 'users.resetPasswordEmailFailed', { email: resetLink.email })}
+            </Banner>
+            <div className="admin-invite-link">
+              <Field label={t('users.resetPasswordLink')}>
+                <Input readOnly value={resetLink.resetUrl} onFocus={(e) => e.currentTarget.select()} data-autofocus />
+              </Field>
+              <Button icon="copy" onClick={copyResetLink}>
+                {t('invitations.copyLink')}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
       <ConfirmDialog
         open={deactivate !== null}
         danger

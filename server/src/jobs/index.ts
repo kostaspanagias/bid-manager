@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import cron, { type ScheduledTask } from 'node-cron';
+import { reportError } from '../core/errorTracking.js';
 import { logger } from '../core/logger.js';
 import { listOrganizations, purgeExpiredSessions } from '../db/admin.js';
 import { scopedDb, type ScopedDb } from '../db/scoped.js';
@@ -93,7 +94,7 @@ export async function runJob(name: string, opts: { date?: string; orgId?: string
     } catch (err) {
       status = 'failed';
       detail = { error: err instanceof Error ? err.message : String(err) };
-      logger.error({ err, job: name, orgId, runDate }, 'job failed');
+      reportError(err, { source: 'job', job: name, orgId, runDate });
     }
     await db.sql('UPDATE job_run SET status = :status, finished_at = now(), detail = CAST(:detail AS jsonb) WHERE org_id = :org_id AND id = :id', {
       id: claim.id,

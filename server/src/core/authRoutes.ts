@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { scopedDb } from '../db/scoped.js';
 import { assertCsrf, deleteSession, endSession, loadSession, startSession, toCtxUser, type ActiveSession } from './auth.js';
-import { findInvitationByTokenHash, findUsersByEmail, type AuthUserRow } from './authStore.js';
+import { findInvitationByTokenHash, findPasswordResetByTokenHash, findUsersByEmail, type AuthUserRow } from './authStore.js';
 import { sha256Hex } from './crypto.js';
 import { conflict, HttpError, notFound, unauthorized } from './errors.js';
 import { hashPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, verifyPassword } from './password.js';
@@ -34,6 +34,8 @@ const changePasswordBody = z
 const invalidCredentials = () => unauthorized('Invalid e-mail or password', 'invalid_credentials');
 const invalidCode = () => unauthorized('Invalid code', 'invalid_code');
 const invalidInvitation = () => notFound('Invitation is invalid or has expired', 'invitation_invalid');
+const invalidReset = () => notFound('The password-reset link is invalid or has expired', 'reset_invalid');
+const resetBody = tokenBody.extend({ password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH) });
 
 async function requireSession(req: Request): Promise<ActiveSession> {
   const active = await loadSession(req);
@@ -249,6 +251,41 @@ export function authRouter(): Router {
       await db.update('invitation', invitation.id, { accepted_at: new Date(), accepted_user_id: user.id });
     });
     res.status(201).json({ ok: true, email: invitation.email });
+  });
+
+  // ---- admin-triggered password reset (POST /api/admin/users/:id/reset-password issues the link) ----
+  async function openReset(token: string) {
+    const reset = await findPasswordResetByTokenHash(sha256Hex(token));
+    if (!reset || reset.used_at || reset.expires_at.getTime() <= Date.now()) throw invalidReset();
+    const user = await scopedDb(reset.org_id, null).get('user', reset.user_id);
+    if (!user || user.active !== true || user.anonymized_at) throw invalidReset();
+    return { reset, user };
+  }
+
+  router.post('/reset-info', inviteLimiter, async (req, res) => {
+    const { reset, user } = await openReset(tokenBody.parse(req.body).token);
+    const org = await scopedDb(reset.org_id, null).get('organization', reset.org_id);
+    res.json({ email: user.email, name: user.name, org_name: org?.name ?? '' });
+  });
+
+  // Sets the new password. The link is single-use; every session of the user ends and a lockout is cleared.
+  // The second factor is untouched: the user still needs their authenticator to log in.
+  router.post('/reset-password', inviteLimiter, async (req, res) => {
+    const body = resetBody.parse(req.body);
+    const { reset, user } = await openReset(body.token);
+    const passwordHash = await hashPassword(body.password);
+    await scopedDb(reset.org_id, user.id).tx(async (db) => {
+      const [locked] = await db.sql('SELECT id FROM password_reset WHERE org_id = :org_id AND id = :id AND used_at IS NULL FOR UPDATE', { id: reset.id });
+      if (!locked) throw invalidReset();
+      await db.sql('UPDATE "user" SET password_hash = :hash, failed_login_count = 0, locked_until = NULL WHERE org_id = :org_id AND id = :id', {
+        hash: passwordHash,
+        id: user.id,
+      });
+      await db.sql('UPDATE password_reset SET used_at = now() WHERE org_id = :org_id AND id = :id', { id: reset.id });
+      await db.sql('DELETE FROM session WHERE org_id = :org_id AND user_id = :id', { id: user.id });
+      await db.audit('user', user.id, 'password_reset_completed');
+    });
+    res.json({ ok: true, email: user.email });
   });
 
   return router;

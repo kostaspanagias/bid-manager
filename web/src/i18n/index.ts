@@ -9,6 +9,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
+import account from './el/account.json';
 import admin from './el/admin.json';
 import auth from './el/auth.json';
 import changes from './el/changes.json';
@@ -48,6 +49,7 @@ export const resources = {
     templates,
     admin,
     my,
+    account,
   },
 } as const;
 

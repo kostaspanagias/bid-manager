@@ -115,6 +115,16 @@ export const authApi = {
     return { email: res?.email ?? null };
   },
 
+  resetInfo(token: string): Promise<{ email: string; name: string; org_name: string }> {
+    return api.post('/auth/reset-info', { token }, noRedirect);
+  },
+
+  /** Admin-triggered password reset: sets the new password with the single-use token of the link. */
+  async resetPassword(input: { token: string; password: string }): Promise<{ email: string | null }> {
+    const res = await api.post<{ ok?: boolean; email?: string } | undefined>('/auth/reset-password', input, noRedirect);
+    return { email: res?.email ?? null };
+  },
+
   async logout(): Promise<void> {
     try {
       await api.post('/auth/logout', {}, noRedirect);

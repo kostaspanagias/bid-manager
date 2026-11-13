@@ -438,7 +438,7 @@ describe('gates: closed tenders are read-only', () => {
         await manager.post(g.url(`/${gateId}/request`)),
         await approver.post(g.url(`/${gateId}/decision`)).send({ decision: 'approved' }),
       ];
-      for (const res of responses) expect([res.status, res.body.error.code]).toEqual([409, 'tender_closed']);
+      for (const res of responses) expect([res.status, res.body.error.code]).toEqual([422, 'tender_closed']);
       const list = await manager.get(g.url());
       expect(list.status).toBe(200);
       expect(list.body.items[2].permissions).toEqual({ can_check: false, can_request: false, can_change_approver: false, can_decide: false, can_reopen: false });
@@ -452,7 +452,7 @@ describe('gates: closed tenders are read-only', () => {
     await as(g.approver).post(g.url(`/${g.gates.G2!.id}/decision`)).send({ decision: 'approved' });
     await dbFor(org).update('tender', g.tender.id, { status: 'submitted', closed_at: new Date() });
     const res = await as(await createUser(org, 'admin')).post(g.url(`/${g.gates.G2!.id}/reopen`)).send({ reason: 'Λάθος απόφαση' });
-    expect([res.status, res.body.error.code]).toEqual([409, 'tender_closed']);
+    expect([res.status, res.body.error.code]).toEqual([422, 'tender_closed']);
   });
 });
 
