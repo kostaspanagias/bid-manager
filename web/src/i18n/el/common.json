@@ -1,0 +1,280 @@
+{
+  "appName": "Bid Manager",
+  "actions": {
+    "save": "Αποθήκευση",
+    "cancel": "Άκυρο",
+    "close": "Κλείσιμο",
+    "delete": "Διαγραφή",
+    "remove": "Αφαίρεση",
+    "edit": "Επεξεργασία",
+    "add": "Προσθήκη",
+    "create": "Δημιουργία",
+    "confirm": "Επιβεβαίωση",
+    "back": "Πίσω",
+    "next": "Επόμενο",
+    "previous": "Προηγούμενο",
+    "search": "Αναζήτηση",
+    "reset": "Καθαρισμός",
+    "clearFilters": "Καθαρισμός φίλτρων",
+    "retry": "Δοκιμή ξανά",
+    "refresh": "Ανανέωση",
+    "upload": "Ανέβασμα",
+    "download": "Λήψη",
+    "import": "Import",
+    "export": "Export",
+    "copy": "Αντιγραφή",
+    "copied": "Αντιγράφηκε",
+    "open": "Άνοιγμα",
+    "view": "Προβολή",
+    "more": "Περισσότερες ενέργειες",
+    "apply": "Εφαρμογή",
+    "yes": "Ναι",
+    "no": "Όχι",
+    "select": "Επιλογή",
+    "send": "Αποστολή",
+    "done": "Ολοκλήρωση"
+  },
+  "labels": {
+    "name": "Όνομα",
+    "title": "Τίτλος",
+    "email": "Email",
+    "role": "Ρόλος",
+    "status": "Κατάσταση",
+    "type": "Τύπος",
+    "date": "Ημερομηνία",
+    "dueDate": "Προθεσμία",
+    "owner": "Υπεύθυνος",
+    "notes": "Σημειώσεις",
+    "description": "Περιγραφή",
+    "actions": "Ενέργειες",
+    "file": "Αρχείο",
+    "files": "Αρχεία",
+    "folder": "Φάκελος",
+    "all": "Όλα",
+    "none": "Κανένα",
+    "unassigned": "Χωρίς υπεύθυνο",
+    "optional": "προαιρετικό",
+    "required": "υποχρεωτικό",
+    "today": "Σήμερα",
+    "total": "Σύνολο",
+    "createdAt": "Δημιουργήθηκε",
+    "updatedAt": "Ενημερώθηκε",
+    "user": "Χρήστης",
+    "tender": "Διαγωνισμός",
+    "deadline": "Προθεσμία υποβολής",
+    "workingDays_one": "{{count}} εργάσιμη",
+    "workingDays_other": "{{count}} εργάσιμες",
+    "calendarDays_one": "{{count}} ημερολογιακή",
+    "calendarDays_other": "{{count}} ημερολογιακές"
+  },
+  "state": {
+    "loading": "Φόρτωση…",
+    "saving": "Αποθήκευση…",
+    "empty": "Δεν υπάρχουν εγγραφές",
+    "emptyFiltered": "Κανένα αποτέλεσμα με αυτά τα φίλτρα",
+    "noData": "—",
+    "saved": "Αποθηκεύτηκε",
+    "deleted": "Διαγράφηκε",
+    "overdue": "Εκπρόθεσμο",
+    "dueToday": "Λήγει σήμερα",
+    "late": "Καθυστέρηση",
+    "blocking": "Μπλοκάρει",
+    "warning": "Προειδοποίηση",
+    "ok": "Εντάξει",
+    "active": "Ενεργός",
+    "inactive": "Ανενεργός",
+    "readOnly": "Μόνο ανάγνωση"
+  },
+  "stub": {
+    "title": "Η οθόνη ετοιμάζεται",
+    "description": "Αυτή η ενότητα δεν έχει υλοποιηθεί ακόμα."
+  },
+  "tminus": {
+    "aria": "{{count}} εργάσιμες πριν από την προθεσμία υποβολής",
+    "ariaToday": "Ημέρα προθεσμίας υποβολής",
+    "ariaPast": "{{count}} εργάσιμες μετά την προθεσμία υποβολής",
+    "left_one": "απομένει {{count}} εργάσιμη",
+    "left_other": "απομένουν {{count}} εργάσιμες",
+    "today": "σήμερα είναι η προθεσμία",
+    "past": "η προθεσμία πέρασε"
+  },
+  "pagination": {
+    "range": "{{from}}–{{to}} από {{total}}",
+    "empty": "0 εγγραφές",
+    "previous": "Προηγούμενη σελίδα",
+    "next": "Επόμενη σελίδα"
+  },
+  "file": {
+    "drop": "Σύρετε αρχεία εδώ ή",
+    "browse": "επιλέξτε από τον υπολογιστή",
+    "maxSize": "Έως {{mb}} MB ανά αρχείο",
+    "tooLarge": "Το αρχείο «{{name}}» ξεπερνά τα {{mb}} MB",
+    "badType": "Το αρχείο «{{name}}» δεν έχει επιτρεπόμενο τύπο",
+    "selected_one": "{{count}} αρχείο επιλέχθηκε",
+    "selected_other": "{{count}} αρχεία επιλέχθηκαν",
+    "removeFile": "Αφαίρεση του {{name}}"
+  },
+  "confirm": {
+    "title": "Είστε σίγουροι;",
+    "deleteTitle": "Διαγραφή",
+    "deleteMessage": "Η ενέργεια δεν αναιρείται."
+  },
+  "errors": {
+    "generic": "Κάτι πήγε στραβά. Δοκιμάστε ξανά.",
+    "network": "Δεν υπάρχει σύνδεση με τον server. Ελέγξτε το δίκτυο και δοκιμάστε ξανά.",
+    "unauthorized": "Η συνεδρία έληξε. Συνδεθείτε ξανά.",
+    "forbidden": "Δεν έχετε δικαίωμα για αυτή την ενέργεια.",
+    "notFound": "Δεν βρέθηκε.",
+    "tooLarge": "Το αρχείο είναι πολύ μεγάλο.",
+    "server": "Σφάλμα στον server. Δοκιμάστε ξανά σε λίγο.",
+    "required": "Υποχρεωτικό πεδίο",
+    "invalidEmail": "Μη έγκυρο email",
+    "invalidDate": "Μη έγκυρη ημερομηνία",
+    "loadFailed": "Η φόρτωση απέτυχε",
+    "boundaryTitle": "Η σελίδα δεν μπόρεσε να εμφανιστεί",
+    "boundaryDescription": "Παρουσιάστηκε απρόσμενο σφάλμα. Ανανεώστε τη σελίδα· αν επιμένει, ενημερώστε τον διαχειριστή.",
+    "reload": "Ανανέωση σελίδας",
+    "notFoundTitle": "Η σελίδα δεν βρέθηκε",
+    "notFoundDescription": "Ο σύνδεσμος είναι λάθος ή η σελίδα έχει μετακινηθεί.",
+    "forbiddenTitle": "Δεν έχετε πρόσβαση",
+    "forbiddenDescription": "Η σελίδα είναι διαθέσιμη μόνο σε διαχειριστές.",
+    "goHome": "Επιστροφή στο Dashboard"
+  },
+  "enums": {
+    "org_role": {
+      "admin": "Admin",
+      "bid_manager": "Bid manager",
+      "member": "Member",
+      "approver": "Approver",
+      "viewer": "Viewer"
+    },
+    "org_role_hint": {
+      "admin": "Διαχειρίζεται χρήστες, templates, αργίες και εταιρικά έγγραφα. Ό,τι κάνει και ο Bid manager.",
+      "bid_manager": "Δημιουργεί διαγωνισμούς, αναθέτει ρόλους, αλλάζει προθεσμίες, κλείνει διαγωνισμό.",
+      "member": "Δουλεύει στους διαγωνισμούς όπου είναι μέλος.",
+      "approver": "Ό,τι και ο Member, και εγκρίνει τις πύλες που του έχουν ανατεθεί.",
+      "viewer": "Βλέπει μόνο. Δεν βλέπει ποτέ τα οικονομικά αρχεία."
+    },
+    "tender_status": {
+      "evaluation": "Αξιολόγηση",
+      "in_progress": "Σε εξέλιξη",
+      "submitted": "Υποβλήθηκε",
+      "no_go": "No-Go",
+      "cancelled": "Ακυρώθηκε"
+    },
+    "holiday_source": {
+      "national": "Εθνική",
+      "movable": "Κινητή",
+      "manual": "Χειροκίνητη"
+    },
+    "template_status": {
+      "draft": "Πρόχειρο",
+      "published": "Δημοσιευμένο"
+    },
+    "template_item_kind": {
+      "role": "Ρόλος",
+      "gate": "Πύλη",
+      "milestone": "Milestone",
+      "task": "Task",
+      "handoff": "Παράδοση",
+      "checklist_item": "Σημείο checklist",
+      "watch_item": "Στοιχείο watchlist",
+      "gate_criterion": "Κριτήριο πύλης"
+    },
+    "offset_unit": {
+      "working": "Εργάσιμες",
+      "calendar": "Ημερολογιακές"
+    },
+    "template_condition": {
+      "always": "Πάντα",
+      "demo": "Αν ζητείται demo",
+      "partners": "Αν υπάρχουν εταίροι"
+    },
+    "milestone_kind": {
+      "gate": "Πύλη",
+      "milestone": "Milestone",
+      "handoff": "Παράδοση"
+    },
+    "gate_decision": {
+      "pending": "Εκκρεμεί",
+      "approved": "Εγκρίθηκε",
+      "approved_with_exception": "Εγκρίθηκε με εξαίρεση",
+      "rejected": "Απορρίφθηκε",
+      "go": "Go",
+      "no_go": "No-Go"
+    },
+    "criterion_type": {
+      "manual": "Χειροκίνητο",
+      "auto": "Αυτόματο"
+    },
+    "auto_rule": {
+      "exclusion_evidence_100": "Απαιτήσεις αποκλεισμού με τεκμήριο = 100%",
+      "register_no_open": "Καμία γραμμή register Ανοιχτή ή Σε εξέλιξη",
+      "handoffs_received": "Όλες οι παραδόσεις πριν την πύλη έχουν παραληφθεί",
+      "guarantee_arrived": "Η εγγυητική έχει παραληφθεί",
+      "docs_valid_on_T": "Όλα τα συνδεδεμένα έγγραφα ισχύουν την ημέρα υποβολής"
+    },
+    "requirement_type": {
+      "exclusion": "Αποκλεισμού",
+      "scored": "Βαθμολογούμενη",
+      "formal": "Τυπική"
+    },
+    "folder": {
+      "participation": "Συμμετοχής",
+      "technical": "Τεχνική",
+      "financial": "Οικονομική",
+      "tender_docs": "Τεύχη διακήρυξης",
+      "clarifications": "Διευκρινίσεις",
+      "other": "Λοιπά"
+    },
+    "requirement_status": {
+      "open": "Ανοιχτή",
+      "in_progress": "Σε εξέλιξη",
+      "covered": "Καλύφθηκε",
+      "verified": "Ελέγχθηκε",
+      "deviation": "Απόκλιση"
+    },
+    "task_status": {
+      "open": "Ανοιχτό",
+      "in_progress": "Σε εξέλιξη",
+      "done": "Ολοκληρώθηκε",
+      "na": "Δ/Α",
+      "cancelled": "Ακυρώθηκε"
+    },
+    "task_section": {
+      "task": "Task",
+      "checklist": "Checklist",
+      "handoff": "Παράδοση"
+    },
+    "risk_status": {
+      "open": "Ανοιχτός",
+      "mitigating": "Σε αντιμετώπιση",
+      "occurred": "Συνέβη",
+      "closed": "Έκλεισε"
+    },
+    "change_source": {
+      "adam": "ΑΔΑΜ",
+      "esidis": "ΕΣΗΔΗΣ",
+      "email": "Email",
+      "other": "Άλλη"
+    },
+    "change_kind": {
+      "clarification": "Διευκρίνιση",
+      "amendment": "Τροποποίηση",
+      "extension": "Παράταση"
+    },
+    "company_document_type": {
+      "iso": "ISO",
+      "gemi": "ΓΕΜΗ",
+      "tax": "Φορολογική ενημερότητα",
+      "insurance": "Ασφαλιστική ενημερότητα",
+      "cv": "CV",
+      "reference_project": "Έργο αναφοράς",
+      "other": "Άλλο"
+    },
+    "file_confidentiality": {
+      "normal": "Κανονικό",
+      "financial": "Οικονομικό (περιορισμένη πρόσβαση)"
+    }
+  }
+}

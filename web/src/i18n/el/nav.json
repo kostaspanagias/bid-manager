@@ -1,0 +1,31 @@
+{
+  "dashboard": "Dashboard",
+  "tenders": "Διαγωνισμοί",
+  "my": "Τα δικά μου",
+  "companyDocuments": "Εταιρικά έγγραφα",
+  "admin": "Διαχείριση",
+  "users": "Χρήστες",
+  "templates": "Templates",
+  "holidays": "Αργίες",
+  "audit": "Audit log",
+  "main": "Κύρια πλοήγηση",
+  "openMenu": "Άνοιγμα μενού",
+  "closeMenu": "Κλείσιμο μενού",
+  "userMenu": "Μενού χρήστη",
+  "skipToContent": "Μετάβαση στο περιεχόμενο",
+  "tenderTabs": {
+    "label": "Ενότητες διαγωνισμού",
+    "overview": "Επισκόπηση",
+    "schedule": "Πρόγραμμα",
+    "gates": "Πύλες",
+    "register": "Register",
+    "tasks": "Tasks",
+    "watch": "Watchlist",
+    "risks": "Κίνδυνοι",
+    "changes": "Change log",
+    "files": "Αρχεία",
+    "documents": "Έγγραφα",
+    "lessons": "Lessons learned",
+    "team": "Ομάδα"
+  }
+}
