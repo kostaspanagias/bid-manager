@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { cx } from '@/lib/cx';
 import type { Tone } from './types';
 
@@ -46,10 +46,24 @@ function inner(item: TabItem) {
  */
 export function Tabs({ items, value, onChange, label, className }: TabsProps) {
   const routeMode = items.some((i) => i.to !== undefined);
+  const listRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+
+  // Keep the active tab visible when the strip is scrolled (phones, many tabs).
+  useEffect(() => {
+    const list = listRef.current;
+    const active = list?.querySelector<HTMLElement>('.is-active');
+    if (!list || !active) return;
+    const left = active.offsetLeft - 24;
+    const right = active.offsetLeft + active.offsetWidth + 24;
+    if (left < list.scrollLeft) list.scrollLeft = left;
+    else if (right > list.scrollLeft + list.clientWidth) list.scrollLeft = right - list.clientWidth;
+  }, [pathname, value]);
+
   if (routeMode) {
     return (
       <nav className={cx('ui-tabs', className)} aria-label={label}>
-        <div className="ui-tabs__list">
+        <div className="ui-tabs__list" ref={listRef}>
           {items.map((item) => (
             <NavLink
               key={item.key}
@@ -66,7 +80,7 @@ export function Tabs({ items, value, onChange, label, className }: TabsProps) {
   }
   return (
     <div className={cx('ui-tabs', className)}>
-      <div className="ui-tabs__list" role="tablist" aria-label={label}>
+      <div className="ui-tabs__list" role="tablist" aria-label={label} ref={listRef}>
         {items.map((item) => (
           <button
             key={item.key}

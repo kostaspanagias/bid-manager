@@ -17,13 +17,17 @@ export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly details: unknown;
+  /** The untranslated message the server sent (English), for logs */
+  readonly serverMessage: string;
 
-  constructor(status: number, code: string, message: string, details?: unknown) {
+  /** `message` is the text to show the user (Greek when the code is known, see translateCode). */
+  constructor(status: number, code: string, message: string, details?: unknown, serverMessage = '') {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.details = details;
+    this.serverMessage = serverMessage;
   }
 
   /** Field errors of a 400 validation response, if `details` is a { field: message } map or zod-like issue list. */
@@ -111,10 +115,26 @@ function fallbackMessage(status: number): string {
             ? 'notFound'
             : status === 413
               ? 'tooLarge'
+              : status === 429
+                ? 'rateLimited'
               : status >= 500
                 ? 'server'
                 : 'generic';
   return i18n.t(`common:errors.${key}`);
+}
+
+/**
+ * The server's messages are English; the UI is Greek. A code is translated when ANY namespace defines
+ * `errorCodes.<code>` — generic ones live in common.json, feature-specific ones in the feature's own file.
+ * Unknown codes fall back to the server message.
+ */
+function translateCode(code: string): string | null {
+  const namespaces = (i18n.options.ns ?? []) as string[];
+  for (const ns of namespaces) {
+    const key = `${ns}:errorCodes.${code}`;
+    if (i18n.exists(key)) return i18n.t(key);
+  }
+  return null;
 }
 
 async function parseError(res: Response): Promise<ApiError> {
@@ -135,7 +155,7 @@ async function parseError(res: Response): Promise<ApiError> {
   } catch {
     /* non-JSON error body (proxy error page etc.) */
   }
-  return new ApiError(res.status, code, message || fallbackMessage(res.status), details);
+  return new ApiError(res.status, code, translateCode(code) ?? (message || fallbackMessage(res.status)), details, message);
 }
 
 async function request<T>(method: string, path: string, body?: unknown, opts: RequestOptions = {}): Promise<T> {

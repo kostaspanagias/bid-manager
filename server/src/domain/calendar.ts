@@ -130,19 +130,20 @@ export function addCalendarDays(date: string, n: number, holidays: Holidays): st
 }
 
 /**
- * Working days in the interval (a, b]: a itself is not counted, b is. Negative when b < a.
- * Inverse of addWorkingDays: workingDaysBetween(d, addWorkingDays(d, n, h), h) === n. Used by R8.
+ * Signed count of working days stepped over when walking from a to b; a itself is never counted.
+ * b ≥ a: working days in (a, b]. b < a: minus the working days in [b, a).
+ * Exact inverse of addWorkingDays: workingDaysBetween(d, addWorkingDays(d, n, h), h) === n. Used by R8.
  */
 export function workingDaysBetween(a: string, b: string, holidays: Holidays): number {
   const diff = daysBetween(a, b);
-  if (diff < 0) return -workingDaysBetween(b, a, holidays);
+  const step = diff < 0 ? -1 : 1;
   let count = 0;
   let d = a;
-  for (let i = 0; i < diff; i++) {
-    d = shiftDays(d, 1);
+  for (let i = 0; i < Math.abs(diff); i++) {
+    d = shiftDays(d, step);
     if (isWorkingDay(d, holidays)) count++;
   }
-  return count;
+  return step * count || 0;
 }
 
 /**

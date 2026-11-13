@@ -19,6 +19,7 @@ function view(u: Row) {
     org_role: u.org_role,
     active: u.active,
     totp_enabled: u.totp_enabled_at !== null,
+    totp_enabled_at: u.totp_enabled_at,
     last_login_at: u.last_login_at,
     created_at: u.created_at,
   };

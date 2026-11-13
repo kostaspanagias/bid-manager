@@ -30,7 +30,7 @@ export interface GuaranteeWarning {
 }
 
 /** The date the participation guarantee must at least be valid until, or null when offer validity is unknown. */
-export function guaranteeRequiredUntil(tender: GuaranteeInput): string | null {
+export function guaranteeRequiredUntil(tender: Omit<GuaranteeInput, 'guarantee_valid_until'>): string | null {
   if (tender.offer_validity_days == null) return null;
   const T = athensDate(tender.submission_deadline_at);
   return shiftDays(T, tender.offer_validity_days + (tender.guarantee_margin_days ?? 30));

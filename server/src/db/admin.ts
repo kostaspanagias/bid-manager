@@ -1,7 +1,7 @@
 // Organization-level (cross-tenant) operations. They live in src/db/ because they are, by nature, not scoped to
 // one org: bootstrap (seed, tests), the job runner iterating over organizations, and the health check.
 // Request handlers must never use these — they get a ScopedDb from req.ctx.
-import { getPool } from './pool.js';
+import { closePool, getPool } from './pool.js';
 
 export interface Organization {
   id: string;
@@ -46,4 +46,9 @@ export async function pingDatabase(timeoutMs = 2000): Promise<boolean> {
 /** Housekeeping: drop expired sessions of every org. Returns how many were removed. */
 export async function purgeExpiredSessions(): Promise<number> {
   return (await getPool().query('DELETE FROM session WHERE expires_at < now()')).rowCount ?? 0;
+}
+
+/** Process shutdown / end of a test file: close the connection pool. */
+export async function closeDatabase(): Promise<void> {
+  await closePool();
 }

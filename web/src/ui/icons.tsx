@@ -54,7 +54,7 @@ export function Icon({ name, size = 16, title, ...rest }: IconProps) {
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.5}
+      strokeWidth={name === 'more' ? 2.4 : 1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       role={title ? 'img' : undefined}

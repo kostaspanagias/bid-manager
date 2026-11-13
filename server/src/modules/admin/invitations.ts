@@ -48,7 +48,8 @@ router.post('/', async (req, res) => {
       expires_at: new Date(Date.now() + INVITATION_DAYS * 86_400_000),
     });
   });
-  const acceptUrl = `${config.appUrl}/accept-invite?token=${encodeURIComponent(token)}`;
+  // The web app's route for accepting an invitation is /invite/:token.
+  const inviteUrl = `${config.appUrl}/invite/${encodeURIComponent(token)}`;
   let emailSent = true;
   try {
     await sendMail({
@@ -58,7 +59,7 @@ router.post('/', async (req, res) => {
         `Ο/Η ${ctx.user.name} σας προσκάλεσε στο Bid Manager.`,
         '',
         `Ορίστε όνομα και κωδικό εδώ (ο σύνδεσμος ισχύει ${INVITATION_DAYS} ημέρες):`,
-        acceptUrl,
+        inviteUrl,
         '',
         'Στην πρώτη είσοδο θα ρυθμίσετε έλεγχο ταυτότητας δύο παραγόντων (εφαρμογή authenticator).',
       ].join('\n'),
@@ -68,7 +69,7 @@ router.post('/', async (req, res) => {
     logger.error({ err }, 'invitation e-mail failed');
   }
   // The token is returned exactly once (only its hash is stored) so the admin can also pass the link on by hand.
-  res.status(201).json({ invitation: view(invitation), token, acceptUrl, emailSent });
+  res.status(201).json({ invitation: view(invitation), token, inviteUrl, emailSent });
 });
 
 router.delete('/:id', async (req, res) => {

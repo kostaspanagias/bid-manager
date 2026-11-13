@@ -1,7 +1,7 @@
 import { createApp } from './app.js';
 import { config } from './config.js';
 import { logger } from './core/logger.js';
-import { closePool } from './db/pool.js';
+import { closeDatabase } from './db/admin.js';
 import { startJobs, stopJobs } from './jobs/index.js';
 
 const app = createApp();
@@ -18,7 +18,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'shutting down');
   await stopJobs().catch(() => undefined);
   server.close(() => {
-    closePool()
+    closeDatabase()
       .catch(() => undefined)
       .finally(() => process.exit(0));
   });

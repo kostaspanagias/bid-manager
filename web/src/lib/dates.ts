@@ -15,6 +15,7 @@ export type Timestamp = string;
 
 const PURE_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const WEEKDAYS_SHORT = ['Κυρ', 'Δευ', 'Τρί', 'Τετ', 'Πέμ', 'Παρ', 'Σάβ'] as const;
+const WEEKDAYS_LONG = ['Κυριακή', 'Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο'] as const;
 
 const athensPartsFmt = new Intl.DateTimeFormat('en-GB', {
   timeZone: ATHENS_TZ,
@@ -99,6 +100,12 @@ export function formatDateTime(value: string | Date | null | undefined): string 
 export function weekdayShort(value: string | Date | null | undefined): string {
   const iso = athensDate(value);
   return iso ? WEEKDAYS_SHORT[weekday(iso)]! : '';
+}
+
+/** Full Greek weekday ('Παρασκευή') of a date / timestamp (Athens). */
+export function weekdayLong(value: string | Date | null | undefined): string {
+  const iso = athensDate(value);
+  return iso ? WEEKDAYS_LONG[weekday(iso)]! : '';
 }
 
 /** 'dd/mm/yyyy' (also d/m/yyyy, dots or dashes) → 'YYYY-MM-DD'; null if not a real date. */

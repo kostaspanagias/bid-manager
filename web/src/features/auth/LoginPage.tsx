@@ -16,6 +16,8 @@ export interface LoginLocationState {
   from?: string;
   /** Why the login screen is shown */
   notice?: 'expired' | 'loggedOut' | 'inviteAccepted';
+  /** Prefill (after accepting an invitation) */
+  email?: string;
 }
 
 /** /login — email + password, then TOTP code or first-time TOTP enrolment. */
@@ -24,41 +26,67 @@ export function LoginPage() {
   const auth = useAuth();
   const location = useLocation();
   const state = (location.state ?? {}) as LoginLocationState;
-  const [step, setStep] = useState<Step>('credentials');
+  const [chosen, setChosen] = useState<Step | null>(null);
+  const [ended, setEnded] = useState(false);
 
   if (auth.status === 'loading') return <PageSpinner label={t('checking')} />;
   if (auth.user) return <Navigate to={state.from && state.from !== '/login' ? state.from : '/'} replace />;
 
+  // A reload in the middle of the login resumes at the open second step.
+  const step: Step = chosen ?? auth.pendingStep ?? 'credentials';
   const notice = auth.sessionExpired ? 'expired' : state.notice;
-  const restart = () => setStep('credentials');
+  /** Back to e-mail + password; drops the half-open session. `sessionEnded` = the server already dropped it. */
+  const restart = (sessionEnded = false) => {
+    setEnded(sessionEnded);
+    setChosen('credentials');
+    void auth.logout().catch(() => undefined);
+  };
 
   if (step === 'totp') return <TotpStep onRestart={restart} />;
   if (step === 'totp_setup') return <TotpSetupStep onRestart={restart} />;
 
   return (
     <AuthLayout title={t('login.title')} subtitle={t('login.subtitle')} footer={t('login.noSignup')}>
-      {notice && (
+      {ended && (
+        <Banner tone="orange" className="auth__notice">
+          {t('totp.sessionEnded')}
+        </Banner>
+      )}
+      {notice && !ended && (
         <Banner tone={notice === 'expired' ? 'orange' : notice === 'inviteAccepted' ? 'green' : 'info'} className="auth__notice">
           {t(`login.${notice}`)}
         </Banner>
       )}
-      <CredentialsForm onNext={setStep} spaced={Boolean(notice)} />
+      <CredentialsForm
+        initialEmail={state.email ?? ''}
+        spaced={Boolean(notice) || ended}
+        onNext={(next) => {
+          setEnded(false);
+          setChosen(next);
+        }}
+      />
     </AuthLayout>
   );
 }
 
 function loginError(err: unknown, t: (key: string) => string): string {
   if (isApiError(err)) {
-    if (err.status === 401 || err.status === 400) return t('login.invalid');
+    if (err.status === 401 || err.code === 'validation_error') return t('login.invalid');
     if (err.status === 429) return t('login.rateLimited');
   }
   return errorMessage(err);
 }
 
-function CredentialsForm({ onNext, spaced }: { onNext: (next: LoginNext) => void; spaced: boolean }) {
+/** The half-open session is gone (timed out, too many wrong codes): the login has to start over. */
+function loginSessionEnded(err: unknown): boolean {
+  return isApiError(err) && ((err.status === 401 && err.code !== 'invalid_code') || err.status === 409);
+}
+
+function CredentialsForm({ onNext, spaced, initialEmail }: { onNext: (next: LoginNext) => void; spaced: boolean; initialEmail: string }) {
   const { t } = useTranslation('auth');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
+  const [touched, setTouched] = useState(false);
   const login = useMutation({
     mutationFn: () => authApi.login(email.trim(), password),
     onSuccess: onNext,
@@ -66,6 +94,7 @@ function CredentialsForm({ onNext, spaced }: { onNext: (next: LoginNext) => void
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    setTouched(true);
     if (!email.trim() || !password) return;
     login.mutate();
   };
@@ -73,7 +102,7 @@ function CredentialsForm({ onNext, spaced }: { onNext: (next: LoginNext) => void
   return (
     <form className="auth__form" onSubmit={submit} noValidate style={spaced ? { marginTop: 'var(--sp-4)' } : undefined}>
       {login.isError && <Banner tone="red">{loginError(login.error, t)}</Banner>}
-      <Field label={t('login.email')} required>
+      <Field label={t('login.email')} required error={touched && !email.trim() ? t('common:errors.required') : undefined}>
         <Input
           type="email"
           name="email"
@@ -83,7 +112,7 @@ function CredentialsForm({ onNext, spaced }: { onNext: (next: LoginNext) => void
           onChange={(e) => setEmail(e.target.value)}
         />
       </Field>
-      <Field label={t('login.password')} required>
+      <Field label={t('login.password')} required error={touched && !password ? t('common:errors.required') : undefined}>
         <Input
           type="password"
           name="password"
@@ -92,7 +121,7 @@ function CredentialsForm({ onNext, spaced }: { onNext: (next: LoginNext) => void
           onChange={(e) => setPassword(e.target.value)}
         />
       </Field>
-      <Button type="submit" variant="primary" fullWidth loading={login.isPending} disabled={!email.trim() || !password}>
+      <Button type="submit" variant="primary" fullWidth loading={login.isPending}>
         {t('login.submit')}
       </Button>
     </form>
@@ -101,14 +130,14 @@ function CredentialsForm({ onNext, spaced }: { onNext: (next: LoginNext) => void
 
 function totpError(err: unknown, t: (key: string) => string): string {
   if (isApiError(err)) {
-    if (err.status === 401 || err.status === 400 || err.status === 422) return t('totp.invalid');
+    if (err.code === 'invalid_code' || err.code === 'validation_error' || err.status === 422) return t('totp.invalid');
     if (err.status === 429) return t('login.rateLimited');
   }
   return errorMessage(err);
 }
 
 /** Second step for users who already have TOTP. */
-function TotpStep({ onRestart }: { onRestart: () => void }) {
+function TotpStep({ onRestart }: { onRestart: (sessionEnded?: boolean) => void }) {
   const { t } = useTranslation('auth');
   const auth = useAuth();
   const [code, setCode] = useState('');
@@ -117,7 +146,10 @@ function TotpStep({ onRestart }: { onRestart: () => void }) {
       await authApi.verifyTotp(value);
       await auth.refresh(); // sets the user → LoginPage redirects
     },
-    onError: () => setCode(''),
+    onError: (err) => {
+      setCode('');
+      if (loginSessionEnded(err)) onRestart(true);
+    },
   });
 
   const change = (value: string) => {
@@ -145,7 +177,7 @@ function TotpStep({ onRestart }: { onRestart: () => void }) {
         <Button type="submit" variant="primary" fullWidth loading={verify.isPending} disabled={code.length !== 6}>
           {t('totp.submit')}
         </Button>
-        <button type="button" className="auth__link-btn" onClick={onRestart}>
+        <button type="button" className="auth__link-btn" onClick={() => onRestart()}>
           {t('totp.back')}
         </button>
       </form>
@@ -154,7 +186,7 @@ function TotpStep({ onRestart }: { onRestart: () => void }) {
 }
 
 /** Second step for users without TOTP yet: show QR + secret, confirm with a code. */
-function TotpSetupStep({ onRestart }: { onRestart: () => void }) {
+function TotpSetupStep({ onRestart }: { onRestart: (sessionEnded?: boolean) => void }) {
   const { t } = useTranslation('auth');
   const auth = useAuth();
   const toast = useToast();
@@ -171,7 +203,10 @@ function TotpSetupStep({ onRestart }: { onRestart: () => void }) {
       await authApi.enableTotp(code);
       await auth.refresh();
     },
-    onError: () => setCode(''),
+    onError: (err) => {
+      setCode('');
+      if (loginSessionEnded(err)) onRestart(true);
+    },
   });
 
   const copySecret = async () => {
@@ -190,7 +225,7 @@ function TotpSetupStep({ onRestart }: { onRestart: () => void }) {
       {setup.isError && (
         <div className="auth__form">
           <Banner tone="red">{t('setup.loadFailed')}</Banner>
-          <Button onClick={onRestart}>{t('totp.back')}</Button>
+          <Button onClick={() => onRestart()}>{t('totp.back')}</Button>
         </div>
       )}
       {setup.data && (
@@ -227,7 +262,7 @@ function TotpSetupStep({ onRestart }: { onRestart: () => void }) {
           <Button type="submit" variant="primary" icon="shield" fullWidth loading={enable.isPending} disabled={code.length !== 6}>
             {t('setup.submit')}
           </Button>
-          <button type="button" className="auth__link-btn" onClick={onRestart}>
+          <button type="button" className="auth__link-btn" onClick={() => onRestart()}>
             {t('totp.back')}
           </button>
         </form>

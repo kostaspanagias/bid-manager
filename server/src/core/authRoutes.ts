@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { scopedDb } from '../db/scoped.js';
-import { assertCsrf, endSession, loadSession, startSession, toCtxUser, type ActiveSession } from './auth.js';
+import { assertCsrf, deleteSession, endSession, loadSession, startSession, toCtxUser, type ActiveSession } from './auth.js';
 import { findInvitationByTokenHash, findUsersByEmail, type AuthUserRow } from './authStore.js';
 import { sha256Hex } from './crypto.js';
 import { conflict, HttpError, notFound, unauthorized } from './errors.js';
@@ -61,11 +61,11 @@ async function promote(req: Request, res: Response, active: ActiveSession, timeS
       WHERE org_id = :org_id AND id = :id`,
     { step: timeStep, enrol, id: user.id },
   );
-  await db.remove('session', active.session.id);
+  await deleteSession(active);
   const csrfToken = await startSession(req, res, user, true);
   if (enrol) await db.audit('user', user.id, 'totp_enabled');
   await db.audit('user', user.id, 'login');
-  res.json(await meBody(active, csrfToken));
+  res.json({ ok: true, ...(await meBody(active, csrfToken)) });
 }
 
 async function totpFailed(res: Response, active: ActiveSession): Promise<never> {
@@ -83,6 +83,8 @@ async function totpFailed(res: Response, active: ActiveSession): Promise<never> 
 
 export function authRouter(): Router {
   const router = Router();
+  // Warm the dummy hash so the very first unknown-e-mail login is not slower than the rest.
+  void verifyPassword(null, 'warm-up');
   const loginLimiter = authLimiter(20);
   const totpLimiter = authLimiter(30);
   const inviteLimiter = authLimiter(30);
@@ -112,16 +114,17 @@ export function authRouter(): Router {
     }
     if (!matched) throw invalidCredentials();
 
-    await endSession(res, await loadSession(req)); // never reuse a pre-login session id
+    await deleteSession(await loadSession(req)); // never reuse a pre-login session id
     const csrfToken = await startSession(req, res, matched, false);
-    res.json({ stage: stageOf(matched), csrfToken });
+    const stage = stageOf(matched);
+    res.json({ stage, next: stage, csrfToken }); // `next` is an alias of `stage`
   });
 
   router.post('/totp', totpLimiter, async (req, res) => {
     const active = await requireSession(req);
     const { code } = codeBody.parse(req.body);
     if (active.session.totp_verified) {
-      res.json(await meBody(active, active.session.csrf_token));
+      res.json({ ok: true, ...(await meBody(active, active.session.csrf_token)) });
       return;
     }
     const { user } = active;
@@ -173,8 +176,8 @@ export function authRouter(): Router {
     const active = await requireSession(req);
     res.set('Cache-Control', 'no-store');
     if (!active.session.totp_verified) {
-      res.json({ stage: stageOf(active.user), csrfToken: active.session.csrf_token });
-      return;
+      // Not logged in yet. details.stage lets a client that reloaded mid-login resume at the right step.
+      throw new HttpError(401, 'totp_required', 'Two-factor verification required', { stage: stageOf(active.user) });
     }
     res.json(await meBody(active, active.session.csrf_token));
   });

@@ -50,8 +50,14 @@ export async function startSession(req: Request, res: Response, user: Pick<AuthU
   return csrfToken;
 }
 
-export async function endSession(res: Response, active: ActiveSession | null): Promise<void> {
+/** Deletes the session row (no cookie change) — e.g. right before a new session replaces it. */
+export async function deleteSession(active: ActiveSession | null): Promise<void> {
   if (active) await scopedDb(active.session.org_id, active.user.id).remove('session', active.session.id);
+}
+
+/** Deletes the session row and clears the cookie. */
+export async function endSession(res: Response, active: ActiveSession | null): Promise<void> {
+  await deleteSession(active);
   res.clearCookie(SESSION_COOKIE, cookieOptions());
 }
 

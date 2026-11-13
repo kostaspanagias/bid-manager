@@ -1,20 +1,21 @@
 /**
  * Auth API adapter — the ONLY file that knows the request/response shapes of /api/auth/*.
- * The server was written in parallel; if a shape differs, fix it here and nothing else changes.
+ * Reconciled with server/src/core/authRoutes.ts; the older `next` field name is still accepted.
  *
- * Assumed contract:
- *   POST /api/auth/login          { email, password }        → { next: 'totp' | 'totp_setup' }
- *   POST /api/auth/totp           { code }                   → { ok: true }
+ *   POST /api/auth/login          { email, password }        → { stage: 'totp' | 'totp_setup', csrfToken }   (401 invalid_credentials)
+ *   POST /api/auth/totp           { code }                   → the /me body (new csrfToken)                  (401 invalid_code)
  *   GET  /api/auth/totp/setup                                → { secret, otpauthUrl, qrDataUrl }
- *   POST /api/auth/totp/enable    { code }                   → { ok: true }
- *   POST /api/auth/accept-invite  { token, name, password }  → { ok: true }
- *   POST /api/auth/logout                                    → { ok: true } | 204
- *   GET  /api/auth/me   → { user: { id, email, name, org_role }, org: { id, name, timezone }, csrfToken } | 401
+ *   POST /api/auth/totp/enable    { code }                   → the /me body (new csrfToken)
+ *   POST /api/auth/invite-info    { token }                  → { email, org_role, org_name }                 (404 invitation_invalid)
+ *   POST /api/auth/accept-invite  { token, name, password }  → 201 { ok: true, email }
+ *   POST /api/auth/logout         (X-CSRF-Token)             → 204
+ *   GET  /api/auth/me   → { stage: 'ready', user: { id, email, name, org_role }, org: { id, name, timezone }, csrfToken }
+ *                       | { stage: 'totp' | 'totp_setup', csrfToken }   (password ok, second step pending)
+ *                       | 401 (no session)
  *
- * Pre-session POSTs (login, totp, totp/enable, accept-invite) are sent without X-CSRF-Token because the token
- * only becomes available from /me after full login; logout sends it.
+ * Every response that carries a csrfToken updates the client's token, so the pre-login POSTs and logout send it.
  */
-import { api, isApiError } from '@/api/client';
+import { api, isApiError, setCsrfToken } from '@/api/client';
 import type { ID, OrgRole } from '@/api/types';
 
 export interface AuthUser {
@@ -33,41 +34,67 @@ export interface AuthOrg {
 export interface Me {
   user: AuthUser;
   org: AuthOrg;
-  csrfToken: string;
 }
 
 export type LoginNext = 'totp' | 'totp_setup';
 
+/** What GET /api/auth/me says about the browser's session. */
+export type Session = { status: 'ready'; me: Me } | { status: 'pending'; next: LoginNext } | { status: 'none' };
+
 export interface TotpSetup {
   secret: string;
   otpauthUrl: string;
-  /** data:image/png;base64,… of the QR code */
+  /** data: URL of the QR code image */
   qrDataUrl: string;
 }
 
-/** Minimum password length shown/validated on the accept-invite form (server validates too). */
+export interface InviteInfo {
+  email: string;
+  org_role: OrgRole;
+  org_name: string;
+}
+
+/** Minimum password length shown/validated on the accept-invite form (server: MIN_PASSWORD_LENGTH). */
 export const PASSWORD_MIN_LENGTH = 12;
+
+interface RawSession {
+  stage?: string;
+  next?: string;
+  user?: AuthUser;
+  org?: AuthOrg;
+  csrfToken?: string;
+}
 
 const noRedirect = { skipAuthRedirect: true } as const;
 
+function readSession(raw: RawSession | undefined): Session {
+  if (raw?.csrfToken) setCsrfToken(raw.csrfToken);
+  if (raw?.user && raw.org) return { status: 'ready', me: { user: raw.user, org: raw.org } };
+  const next = raw?.stage ?? raw?.next;
+  if (next === 'totp' || next === 'totp_setup') return { status: 'pending', next };
+  return { status: 'none' };
+}
+
 export const authApi = {
-  /** null when there is no (fully verified) session. */
-  async me(): Promise<Me | null> {
+  async session(): Promise<Session> {
     try {
-      return await api.get<Me>('/auth/me', noRedirect);
+      return readSession(await api.get<RawSession>('/auth/me', noRedirect));
     } catch (err) {
-      if (isApiError(err) && err.status === 401) return null;
+      if (isApiError(err) && err.status === 401) {
+        setCsrfToken(null);
+        return { status: 'none' };
+      }
       throw err;
     }
   },
 
   async login(email: string, password: string): Promise<LoginNext> {
-    const res = await api.post<{ next: LoginNext }>('/auth/login', { email, password }, noRedirect);
-    return res.next === 'totp_setup' ? 'totp_setup' : 'totp';
+    const session = readSession(await api.post<RawSession>('/auth/login', { email, password }, noRedirect));
+    return session.status === 'pending' ? session.next : 'totp';
   },
 
   async verifyTotp(code: string): Promise<void> {
-    await api.post<{ ok: true }>('/auth/totp', { code }, noRedirect);
+    readSession(await api.post<RawSession>('/auth/totp', { code }, noRedirect));
   },
 
   getTotpSetup(): Promise<TotpSetup> {
@@ -75,14 +102,24 @@ export const authApi = {
   },
 
   async enableTotp(code: string): Promise<void> {
-    await api.post<{ ok: true }>('/auth/totp/enable', { code }, noRedirect);
+    readSession(await api.post<RawSession>('/auth/totp/enable', { code }, noRedirect));
   },
 
-  async acceptInvite(input: { token: string; name: string; password: string }): Promise<void> {
-    await api.post<{ ok: true }>('/auth/accept-invite', input, noRedirect);
+  inviteInfo(token: string): Promise<InviteInfo> {
+    return api.post<InviteInfo>('/auth/invite-info', { token }, noRedirect);
+  },
+
+  /** Returns the invited e-mail when the server reports it (to prefill the login form). */
+  async acceptInvite(input: { token: string; name: string; password: string }): Promise<{ email: string | null }> {
+    const res = await api.post<{ ok?: boolean; email?: string } | undefined>('/auth/accept-invite', input, noRedirect);
+    return { email: res?.email ?? null };
   },
 
   async logout(): Promise<void> {
-    await api.post('/auth/logout', {}, noRedirect);
+    try {
+      await api.post('/auth/logout', {}, noRedirect);
+    } finally {
+      setCsrfToken(null);
+    }
   },
 };

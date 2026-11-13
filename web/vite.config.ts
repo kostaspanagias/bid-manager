@@ -13,5 +13,5 @@ export default defineConfig({
       '/api': { target: 'http://127.0.0.1:3001', changeOrigin: false },
     },
   },
-  build: { outDir: 'dist', sourcemap: true },
+  build: { outDir: 'dist', sourcemap: true, chunkSizeWarningLimit: 900 },
 });

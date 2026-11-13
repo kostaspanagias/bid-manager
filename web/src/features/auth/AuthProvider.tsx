@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { setCsrfToken, setUnauthorizedHandler } from '@/api/client';
+import { setUnauthorizedHandler } from '@/api/client';
 import type { OrgRole } from '@/api/types';
-import { authApi, type AuthOrg, type AuthUser, type Me } from './authApi';
+import { authApi, type AuthOrg, type AuthUser, type LoginNext, type Me, type Session } from './authApi';
 
 export const ME_KEY = ['auth', 'me'] as const;
 
@@ -17,6 +17,8 @@ export interface AuthContextValue {
   isAdmin: boolean;
   /** Not a viewer (UI hint only — the server enforces permissions) */
   canEdit: boolean;
+  /** Password accepted but the TOTP step is still open (e.g. the page was reloaded mid-login) */
+  pendingStep: LoginNext | null;
   /** True after the session ended on its own (401 while logged in), until the next login */
   sessionExpired: boolean;
   /** Re-reads /api/auth/me (call after completing login) */
@@ -32,11 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const query = useQuery({
     queryKey: ME_KEY,
-    queryFn: async () => {
-      const me = await authApi.me();
-      setCsrfToken(me?.csrfToken ?? null); // before any dependent query/mutation can run
-      return me;
-    },
+    queryFn: authApi.session, // also hands the CSRF token to the API client before dependent queries run
     staleTime: 5 * 60_000,
     retry: false,
   });
@@ -49,43 +47,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Any 401 from a non-auth endpoint means the session ended (inactivity timeout, logout elsewhere).
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      const wasLoggedIn = Boolean(queryClient.getQueryData<Me | null>(ME_KEY));
-      setCsrfToken(null);
-      queryClient.setQueryData(ME_KEY, null);
+      const wasLoggedIn = queryClient.getQueryData<Session>(ME_KEY)?.status === 'ready';
+      queryClient.setQueryData<Session>(ME_KEY, { status: 'none' });
       if (wasLoggedIn) setSessionExpired(true);
     });
     return () => setUnauthorizedHandler(null);
   }, [queryClient]);
 
   const refresh = useCallback(async () => {
-    const me = await queryClient.fetchQuery({
-      queryKey: ME_KEY,
-      queryFn: async () => {
-        const res = await authApi.me();
-        setCsrfToken(res?.csrfToken ?? null);
-        return res;
-      },
-      staleTime: 0,
-    });
-    if (me) {
+    const session = await queryClient.fetchQuery({ queryKey: ME_KEY, queryFn: authApi.session, staleTime: 0 });
+    if (session.status === 'ready') {
       setSessionExpired(false);
       dropData();
+      return session.me;
     }
-    return me;
+    return null;
   }, [queryClient, dropData]);
 
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
     } finally {
-      setCsrfToken(null);
       setSessionExpired(false);
-      queryClient.setQueryData(ME_KEY, null);
+      queryClient.setQueryData<Session>(ME_KEY, { status: 'none' });
       dropData();
     }
   }, [queryClient, dropData]);
 
-  const me = query.data ?? null;
+  const session = query.data;
+  const me = session?.status === 'ready' ? session.me : null;
+  const pendingStep = session?.status === 'pending' ? session.next : null;
   const value = useMemo<AuthContextValue>(() => {
     const role = me?.user.org_role;
     return {
@@ -95,11 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasRole: (...roles) => Boolean(role && roles.includes(role)),
       isAdmin: role === 'admin',
       canEdit: Boolean(role && role !== 'viewer'),
+      pendingStep,
       sessionExpired,
       refresh,
       logout,
     };
-  }, [me, query.isPending, sessionExpired, refresh, logout]);
+  }, [me, pendingStep, query.isPending, sessionExpired, refresh, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -150,7 +150,7 @@ export function as(user: { id: string; org_id: string }): AuthedAgent {
 export type AuthedAgent = Agent & PromiseLike<Agent>;
 
 /** Records a chain of calls (.post(url).send(body).expect(201)…) and replays it on the agent once it exists. */
-function deferred(start: Promise<Agent>, calls: [string | symbol, unknown[]][]): unknown {
+function deferred(start: Promise<Agent>, calls: [string, unknown[]][]): unknown {
   const settle = () =>
     start.then((agent) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,14 +158,22 @@ function deferred(start: Promise<Agent>, calls: [string | symbol, unknown[]][]):
       for (const [method, args] of calls) current = current[method](...args);
       return current;
     });
-  return new Proxy(() => undefined, {
-    get(_target, prop) {
-      if (prop === 'then') return (onOk?: (v: unknown) => unknown, onErr?: (e: unknown) => unknown) => settle().then(onOk, onErr);
-      if (prop === 'catch') return (onErr?: (e: unknown) => unknown) => settle().catch(onErr);
-      if (prop === 'finally') return (fn?: () => void) => settle().finally(fn);
-      return (...args: unknown[]) => deferred(start, [...calls, [prop, args]]);
+  // Only real agent / request methods are recordable, so the object does not pretend to have every property
+  // (assertion libraries and util.inspect probe for things like asymmetricMatch, toJSON, nodeType…).
+  const proto = (calls.length === 0 ? request.agent.prototype : request.Test.prototype) as unknown as Record<string, unknown>;
+  return new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (typeof prop !== 'string') return undefined;
+        if (prop === 'then') return (onOk?: (v: unknown) => unknown, onErr?: (e: unknown) => unknown) => settle().then(onOk, onErr);
+        if (prop === 'catch') return (onErr?: (e: unknown) => unknown) => settle().catch(onErr);
+        if (prop === 'finally') return (fn?: () => void) => settle().finally(fn);
+        if (typeof proto[prop] !== 'function') return undefined;
+        return (...args: unknown[]) => deferred(start, [...calls, [prop, args]]);
+      },
     },
-  });
+  );
 }
 
 /** An unauthenticated agent (keeps cookies between requests, like a browser) — for login-flow tests. */

@@ -312,9 +312,9 @@
   color: var(--c-text-muted);
   font-size: var(--text-sm);
 }
-.tender-head__meta > span {
+.tender-head__kv {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 5px;
   min-width: 0;
 }

@@ -1,0 +1,120 @@
+/* Admin pages */
+.admin-tabs {
+  margin-bottom: var(--sp-4);
+}
+.admin-you {
+  margin-left: var(--sp-2);
+}
+.admin-role-hint {
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+}
+.admin-invite-link {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.admin-invite-link .ui-field {
+  flex: 1 1 240px;
+}
+.admin-invite-link .ui-input {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* Year stepper (holidays) */
+.year-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+.year-stepper .ui-btn {
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+}
+.year-stepper .ui-btn:hover {
+  background: var(--c-surface-3);
+}
+.year-stepper__value {
+  min-width: 4.5ch;
+  padding: 0 var(--sp-2);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.holidays-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+.holidays-toolbar__summary {
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Audit */
+.audit-fields {
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+}
+.audit-meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-1) var(--sp-4);
+  margin-bottom: var(--sp-4);
+  font-size: var(--text-sm);
+}
+.audit-meta dt {
+  color: var(--c-text-muted);
+}
+.audit-meta dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.audit-diff-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-2);
+}
+.audit-diff td {
+  vertical-align: top !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+  min-width: 140px;
+}
+.audit-diff td:first-child {
+  min-width: 0;
+  white-space: nowrap !important;
+  color: var(--c-text-muted);
+}
+.audit-diff tr.is-changed td:first-child {
+  color: var(--c-text);
+  font-weight: 600;
+}
+.audit-diff tr.is-changed td.audit-diff__before {
+  background: var(--c-red-bg);
+}
+.audit-diff tr.is-changed td.audit-diff__after {
+  background: var(--c-green-bg);
+}
+.audit-diff__null {
+  color: var(--c-text-faint);
+  font-style: italic;
+  font-family: var(--font-sans);
+}
