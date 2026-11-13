@@ -1,0 +1,22 @@
+# Local trial on one machine (e.g. Docker Desktop on Windows): the production stack plus a mail catcher.
+#   powershell -ExecutionPolicy Bypass -File ops\local\setup.ps1      # writes .env with random secrets
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml exec app node server/dist/db/seed.js
+# App:    https://localhost:8443   (Caddy's own local certificate — the browser warns once; accept it)
+# E-mail: http://localhost:8025    (Mailpit shows every message the app "sends"; nothing leaves the machine)
+services:
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+    networks: [internal]
+
+  app:
+    depends_on:
+      mailpit:
+        condition: service_started
+
+  caddy:
+    ports: !override
+      - "127.0.0.1:8443:443"
