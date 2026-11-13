@@ -198,7 +198,7 @@ const importUpload: RequestHandler = (req, res, next) => {
   });
 };
 
-const zMapping = z.record(z.enum(IMPORT_FIELDS), z.number().int().min(0).nullable());
+const zMapping = z.partialRecord(z.enum(IMPORT_FIELDS), z.number().int().min(0).nullable());
 const importFields = z.object({
   sheet: z.string().max(200).optional(),
   /** JSON object: field → 0-based column index or null. Absent = use the suggested mapping. */

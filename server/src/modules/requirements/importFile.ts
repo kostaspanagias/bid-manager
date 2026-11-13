@@ -40,7 +40,7 @@ type Grid = Omit<ParsedFile, 'headers' | 'rows' | 'rowNumbers'> & { cells: strin
 
 function finish(grid: Grid): ParsedFile {
   const { cells, firstLine, ...meta } = grid;
-  const isBlank = (row: string[]) => row.every((c) => c === '');
+  const isBlank = (row: string[]) => row.every((c) => c.trim() === '');
   const headerIndex = cells.findIndex((row) => !isBlank(row));
   if (headerIndex < 0) throw fail('import_empty_file', 'The file has no header row');
   let headers = (cells[headerIndex] as string[]).map((h) => h.trim());

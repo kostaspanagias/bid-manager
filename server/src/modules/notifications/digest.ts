@@ -32,7 +32,7 @@ export interface DigestItem {
   /** Working days from today to `date` (negative = overdue). */
   inWorkingDays: number | null;
   tab: TenderTab;
-  /** Gate key (G2), handoff roles. */
+  /** Gate key (G2); names of the handoff's tender roles. */
   gateKey?: string;
   from?: string | null;
   to?: string | null;
@@ -101,6 +101,7 @@ export function buildDigest(snap: Snapshot, views: readonly TenderView[], user: 
     return date <= horizon ? 'upcoming' : null;
   };
   const membership = membershipOf(snap, user.id);
+  const roleNames = new Map(snap.roles.map((r) => [`${r.tender_id}:${r.key}`, r.name]));
   const isManager = user.org_role === 'admin' || user.org_role === 'bid_manager';
   const canWrite = user.org_role !== 'viewer';
 
@@ -113,6 +114,7 @@ export function buildDigest(snap: Snapshot, views: readonly TenderView[], user: 
     const owns = (row: { owner_user_id: string | null; owner_role_key: string | null }): boolean =>
       row.owner_user_id === user.id || (row.owner_user_id === null && holds(row.owner_role_key));
 
+    const roleName = (key: string | null): string | null => (key ? (roleNames.get(`${tenderId}:${key}`) ?? key) : null);
     const items: DigestItem[] = [];
     const add = (item: Omit<DigestItem, 'inWorkingDays'>) =>
       items.push({ ...item, inWorkingDays: item.date ? workingDaysBetween(today, item.date, holidays) : null });
@@ -120,7 +122,7 @@ export function buildDigest(snap: Snapshot, views: readonly TenderView[], user: 
     for (const t of view.tasks) {
       if (t.section === 'handoff') {
         if (t.received_at !== null) continue;
-        const roles = { from: t.handoff_from_role, to: t.handoff_to_role };
+        const roles = { from: roleName(t.handoff_from_role), to: roleName(t.handoff_to_role) };
         if (isDelivered(t)) {
           if (holds(t.handoff_to_role)) {
             add({ kind: 'handoff_receive', id: t.id, title: t.title, date: t.due_date, bucket: bucketOf(t.due_date) ?? 'waiting', tab: 'tasks', ...roles });

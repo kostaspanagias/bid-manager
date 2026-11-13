@@ -70,7 +70,7 @@ describe('daily digest — who gets what', () => {
     const [bob] = mailsTo(team.bob);
     expect(bob?.subject).toBe('[Bid Manager] 2 εκπρόθεσμα · 1 για σήμερα · G1 σε 2 εργάσιμες — Προμήθεια εξοπλισμού πληροφορικής');
     expect(bob?.text).toContain('Task: Συλλογή datasheets κατασκευαστών · Τρί 08/06/2027 (πριν από 1 εργάσιμη)');
-    expect(bob?.text).toContain('Παράδοση (B → A): Λίστα απαιτούμενων πιστοποιητικών, MAF και CVs · Τρί 08/06/2027');
+    expect(bob?.text).toContain('Παράδοση (Β Τεχνική → Α Δικαιολογητικά): Λίστα απαιτούμενων πιστοποιητικών, MAF και CVs · Τρί 08/06/2027');
     expect(bob?.text).toContain('Watchlist: MAF κατασκευαστή — τελευταία ημέρα αίτησης · σήμερα');
     expect(bob?.text).toContain('Task: BOM με ακριβείς κωδικούς · Παρ 11/06/2027 (σε 2 εργάσιμες)');
     expect(bob?.text).toContain('Πύλη G1 Solution freeze: περιμένει την απόφασή σας · Παρ 11/06/2027');
@@ -80,7 +80,7 @@ describe('daily digest — who gets what', () => {
 
     // Carol (role C): the delivered handoff waits for her receipt; her far-away task is not there yet.
     const [carol] = mailsTo(team.carol);
-    expect(carol?.text).toContain('Παραλαβή (B → C): BOM κλειδωμένο (κωδικοί, ποσότητες, vendor quotes) — παραδόθηκε, περιμένει την επιβεβαίωσή σας');
+    expect(carol?.text).toContain('Παραλαβή (Β Τεχνική → Γ Οικονομική): BOM κλειδωμένο (κωδικοί, ποσότητες, vendor quotes) — παραδόθηκε, περιμένει την επιβεβαίωσή σας');
     expect(carol?.text).not.toContain('Κοστολόγηση');
     expect(carol?.subject).toContain('1 τις επόμενες 3 εργάσιμες');
 
@@ -115,12 +115,14 @@ describe('daily digest — who gets what', () => {
     // The bid manager owns nothing but still hears about the tender, with the team's overdue counts.
     const manager = mailsTo(team.manager)[0];
     expect(manager?.subject).toBe('[Bid Manager] G1 σε 2 εργάσιμες · 3 κόκκινες προειδοποιήσεις — Προμήθεια εξοπλισμού πληροφορικής');
-    expect(manager?.text).toContain('Ομάδα: 2 εκπρόθεσμα tasks, 1 εκπρόθεσμες παραδόσεις');
+    expect(manager?.text).toContain('Ομάδα: 2 εκπρόθεσμα tasks, 1 εκπρόθεσμη παράδοση');
     expect(manager?.text).not.toContain('Εταιρικά έγγραφα');
 
     // Admin: documents expired or expiring within 30 days — not the archived one, not the one valid for a year.
     const admin = mailsTo(team.admin)[0];
     expect(admin?.text).toContain('== Εταιρικά έγγραφα ==');
+    expect(admin?.text).toContain('ΠΡΟΕΙΔΟΠΟΙΗΣΕΙΣ');
+    expect(admin?.text).toContain('Δεν έχετε δικά σας εκπρόθεσμα ή επικείμενα');
     expect(admin?.text).toContain('Ασφαλιστική ενημερότητα — έληξε 06/06/2027');
     expect(admin?.text).toContain('ISO 9001:2015 — λήγει 17/06/2027');
     expect(admin?.text).toContain('Φορολογική ενημερότητα — λήγει 23/06/2027');

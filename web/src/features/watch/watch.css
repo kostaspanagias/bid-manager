@@ -1,0 +1,31 @@
+.watch-banners:not(:empty) {
+  margin-bottom: var(--sp-4);
+}
+.watch-col-name {
+  min-width: 240px;
+}
+.watch-notes {
+  font-style: italic;
+}
+.watch-late {
+  color: var(--c-orange-fg);
+  font-weight: var(--weight-medium);
+}
+.watch-state {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+}
+.watch-legend {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--text-sm);
+}
+.watch-lead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--sp-2);
+}
+.watch-lead > :only-child {
+  grid-column: 1 / -1;
+}

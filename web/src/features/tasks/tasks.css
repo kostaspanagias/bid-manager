@@ -1,0 +1,121 @@
+/* Tasks tab (also used by watch / my for the shared bits) */
+.tasks-views {
+  margin-bottom: var(--sp-4);
+}
+.tasks-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin: var(--sp-3) 0;
+}
+.tasks-toolbar p {
+  margin: 0;
+  font-size: var(--text-sm);
+  max-width: 70ch;
+}
+.tasks-col-title {
+  min-width: 220px;
+}
+.tasks-desc {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  white-space: normal;
+}
+.tasks-chip {
+  margin-left: var(--sp-2);
+}
+.tasks-struck {
+  text-decoration: line-through;
+}
+.tasks-inline.ui-input {
+  height: var(--control-h-sm);
+  min-width: 132px;
+  max-width: 200px;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: var(--text-sm);
+}
+.tasks-overdue {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--c-red-fg);
+  font-weight: var(--weight-medium);
+}
+.tasks-filter-checks {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: var(--control-h);
+  align-self: flex-end;
+}
+
+/* Checklists */
+.checklists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: var(--sp-4);
+  align-items: start;
+}
+.checklist {
+  list-style: none;
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+}
+.checklist__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--c-border);
+}
+.checklist__box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 3px 2px 0 0;
+  accent-color: var(--c-primary);
+}
+.checklist__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-top: 2px;
+  overflow-wrap: anywhere;
+}
+.checklist__item.is-done .checklist__text {
+  color: var(--c-text-muted);
+}
+.checklist__item.is-off .checklist__text {
+  color: var(--c-text-faint);
+  text-decoration: line-through;
+}
+.checklist__actions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* Handoffs */
+.handoff-route {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+.handoff-route > span[aria-hidden] {
+  color: var(--c-text-faint);
+}
+.handoff-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 150px;
+}

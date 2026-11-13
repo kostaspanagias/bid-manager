@@ -1,4 +1,117 @@
 {
   "title": "Tasks και παραδόσεις",
-  "subtitle": "Tasks, checklists ανά ρόλο και παραδόσεις (handoffs) μεταξύ φακέλων."
+  "subtitle": "Tasks, checklists ανά ρόλο και παραδόσεις (handoffs) μεταξύ φακέλων.",
+  "views": {
+    "tasks": "Tasks",
+    "checklists": "Checklists",
+    "handoffs": "Παραδόσεις"
+  },
+  "owner": {
+    "roles": "Ρόλοι διαγωνισμού",
+    "people": "Άτομα"
+  },
+  "tasks": {
+    "add": "Νέο task",
+    "search": "Αναζήτηση σε tasks",
+    "summary": "{{count}} από {{total}} tasks",
+    "statusActive": "Ανοιχτά και σε εξέλιξη",
+    "onlyOverdue": "Μόνο εκπρόθεσμα ({{count}})",
+    "onlyMine": "Μόνο τα δικά μου",
+    "empty": "Δεν υπάρχουν tasks",
+    "emptyHint": "Τα tasks δημιουργούνται από το template του διαγωνισμού. Μπορείτε να προσθέσετε και δικά σας.",
+    "removeTitle": "Διαγραφή task",
+    "removeMessage": "Θα διαγραφεί το «{{title}}». Η ενέργεια δεν αναιρείται."
+  },
+  "checklists": {
+    "add": "Προσθήκη σημείου",
+    "addLine": "Σημείο",
+    "empty": "Δεν υπάρχουν checklists",
+    "emptyHint": "Τα checklists ανά μέλος αντιγράφονται από το template σε κάθε νέο διαγωνισμό.",
+    "noRole": "Χωρίς ρόλο",
+    "mine": "ο ρόλος μου",
+    "progress": "Πρόοδος",
+    "progressWithNa": "{{done}}/{{total}} · {{na}} Δ/Α",
+    "na": "Δ/Α",
+    "applies": "Ισχύει",
+    "naHint": "Ένα σημείο που δεν ισχύει σημειώνεται «Δ/Α» και δεν διαγράφεται."
+  },
+  "handoffs": {
+    "add": "Νέα παράδοση",
+    "hint": "Κάθε παράδοση έχει ημερομηνία και παραλήπτη. Ολοκληρώνεται όταν ο παραλήπτης επιβεβαιώσει την παραλαβή.",
+    "route": "Από → Προς",
+    "from": "Από",
+    "to": "Προς",
+    "what": "Τι",
+    "when": "Πότε",
+    "deliver": "Παραδόθηκε",
+    "receive": "Επιβεβαίωση παραλαβής",
+    "receiveDirect": "Επιβεβαίωση παραλαβής",
+    "undoDeliver": "Αναίρεση παράδοσης",
+    "undoReceive": "Αναίρεση παραλαβής",
+    "markNa": "Σήμανση ως Δ/Α",
+    "reopen": "Επαναφορά",
+    "empty": "Δεν υπάρχουν παραδόσεις",
+    "emptyHint": "Οι παραδόσεις μεταξύ φακέλων δημιουργούνται από το template.",
+    "removeTitle": "Διαγραφή παράδοσης",
+    "waitingTitle_one": "{{count}} παράδοση περιμένει την επιβεβαίωσή σας",
+    "waitingTitle_other": "{{count}} παραδόσεις περιμένουν την επιβεβαίωσή σας",
+    "deliveredBy": "Παράδοση: {{name}}, {{at}}",
+    "receivedBy": "Παραλαβή: {{name}}, {{at}}",
+    "receivedByOverride": "Παραλαβή εκ μέρους του παραλήπτη: {{name}}, {{at}}",
+    "overrideTitle": "Παραλαβή εκ μέρους του παραλήπτη",
+    "overrideHint": "Δεν έχετε τον ρόλο «{{role}}». Γράψτε γιατί επιβεβαιώνετε εσείς την παραλαβή· η σημείωση καταγράφεται.",
+    "overrideNote": "Αιτιολόγηση",
+    "state": {
+      "pending": "Εκκρεμεί",
+      "pendingLate": "Εκπρόθεσμη",
+      "delivered": "Παραδόθηκε — αναμένει παραλαβή",
+      "deliveredLate": "Παραδόθηκε — εκπρόθεσμη παραλαβή",
+      "received": "Παραλήφθηκε",
+      "na": "Δ/Α",
+      "cancelled": "Ακυρώθηκε"
+    },
+    "toast": {
+      "deliver": "Η παράδοση καταγράφηκε",
+      "undo-deliver": "Η παράδοση αναιρέθηκε",
+      "receive": "Η παραλαβή επιβεβαιώθηκε",
+      "undo-receive": "Η παραλαβή αναιρέθηκε"
+    }
+  },
+  "form": {
+    "title": {
+      "add": { "task": "Νέο task", "checklist": "Νέο σημείο checklist", "handoff": "Νέα παράδοση" },
+      "edit": { "task": "Επεξεργασία task", "checklist": "Επεξεργασία σημείου checklist", "handoff": "Επεξεργασία παράδοσης" }
+    },
+    "what": "Τι παραδίδεται",
+    "pickRole": "— Επιλογή ρόλου —",
+    "sameRole": "Ο παραλήπτης πρέπει να είναι διαφορετικός ρόλος",
+    "ownerHint": "Ρόλος του διαγωνισμού ή συγκεκριμένο άτομο",
+    "checklistOwnerHint": "Τα checklists ομαδοποιούνται ανά ρόλο",
+    "dateFromSchedule": "Ακολουθεί το χρονοδιάγραμμα· αλλάζει από το milestone."
+  },
+  "errorCodes": {
+    "tender_closed": "Ο διαγωνισμός έχει κλείσει· τα στοιχεία του είναι μόνο για ανάγνωση.",
+    "unknown_user": "Ο χρήστης δεν βρέθηκε ή είναι ανενεργός.",
+    "unknown_role": "Ο ρόλος δεν υπάρχει σε αυτόν τον διαγωνισμό.",
+    "unknown_milestone": "Το milestone δεν ανήκει σε αυτόν τον διαγωνισμό.",
+    "owner_conflict": "Ο υπεύθυνος είναι είτε ρόλος είτε άτομο, όχι και τα δύο.",
+    "na_only_checklist": "Το «Δ/Α» ισχύει για σημεία checklist και παραδόσεις· ένα task ακυρώνεται.",
+    "checklist_use_na": "Τα σημεία του template δεν διαγράφονται· σημειώστε το ως «Δ/Α».",
+    "handoff_use_na": "Οι παραδόσεις του template δεν διαγράφονται· ο bid manager τις σημειώνει ως «Δ/Α».",
+    "handoff_roles_required": "Η παράδοση θέλει ρόλο «Από» και ρόλο «Προς».",
+    "handoff_same_role": "Οι ρόλοι «Από» και «Προς» πρέπει να διαφέρουν.",
+    "not_a_handoff": "Το task αυτό δεν είναι παράδοση.",
+    "handoff_not_sender": "Την παράδοση τη δηλώνει ο ρόλος που παραδίδει ή ο bid manager.",
+    "handoff_not_recipient": "Την παραλαβή την επιβεβαιώνει μόνο ο ρόλος που παραλαμβάνει.",
+    "handoff_override_note_required": "Για παραλαβή εκ μέρους του παραλήπτη χρειάζεται αιτιολόγηση.",
+    "handoff_already_delivered": "Η παράδοση έχει ήδη δηλωθεί.",
+    "handoff_not_delivered": "Η παράδοση δεν έχει δηλωθεί.",
+    "handoff_already_received": "Η παράδοση έχει ήδη παραληφθεί.",
+    "handoff_not_received": "Η παράδοση δεν έχει παραληφθεί.",
+    "handoff_not_active": "Η παράδοση είναι «Δ/Α» ή ακυρωμένη.",
+    "handoff_use_receive": "Η παράδοση ολοκληρώνεται με την επιβεβαίωση παραλαβής.",
+    "handoff_use_deliver": "Χρησιμοποιήστε το «Παραδόθηκε».",
+    "handoff_manager_only": "Μόνο ο bid manager μπορεί να κάνει αυτή την αλλαγή σε παράδοση.",
+    "handoff_date_from_schedule": "Η ημερομηνία της παράδοσης ακολουθεί το χρονοδιάγραμμα· αλλάξτε το milestone."
+  }
 }

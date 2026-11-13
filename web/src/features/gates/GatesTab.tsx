@@ -305,10 +305,13 @@ function CriterionRow({ gate, criterion: c, editable, showLinks, onChanged, onNo
   const { nameOf } = useUsers();
   const toast = useToast();
 
+  // The box shows the clicked value at once (set in the same event), then follows the server again.
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const toggle = useMutation({
     mutationFn: (checked: boolean) => setCriterion(tenderId, gate.id, c.id, { checked }),
     onSuccess: onChanged,
     onError: (err) => toast.error(errorMessage(err)),
+    onSettled: () => setOptimistic(null),
   });
 
   const checkedLine = c.checked_at
@@ -335,9 +338,12 @@ function CriterionRow({ gate, criterion: c, editable, showLinks, onChanged, onNo
             className="criterion__check"
             label={c.text}
             hint={extra || undefined}
-            checked={toggle.isPending ? Boolean(toggle.variables) : c.satisfied}
+            checked={optimistic ?? c.satisfied}
             disabled={toggle.isPending}
-            onChange={(e) => toggle.mutate(e.target.checked)}
+            onChange={(e) => {
+              setOptimistic(e.target.checked);
+              toggle.mutate(e.target.checked);
+            }}
           />
         ) : (
           <div className="criterion__static">

@@ -18,7 +18,7 @@
   },
   "badge": {
     "pending": "Αλλάζει το template",
-    "applied": "Πέρασε στην v{{version}}"
+    "applied": "Πέρασε στην {{version}}"
   },
   "by": "{{name}} · {{date}}",
   "usedTemplate": "Ο διαγωνισμός ακολούθησε το template {{version}}.",

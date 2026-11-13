@@ -387,7 +387,7 @@ describe('R18 — financial files', () => {
     const w = await withFiles();
     const tech = await as(w.technicalMember);
     const before = (await blobs(w.org, w.tender)).length;
-    for (const fields of [{ folder: 'financial' }, { folder: 'other', confidentiality: 'financial' }]) {
+    for (const fields of [{ folder: 'financial' }, { folder: 'other', confidentiality: 'financial' }] as Record<string, string>[]) {
       const res = await upload(tech, w.tender, 'guess', 'prices.xlsx', fields);
       expect([res.status, res.body.error.code]).toEqual([403, 'financial_restricted']);
     }

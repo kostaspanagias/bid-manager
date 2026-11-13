@@ -23,6 +23,9 @@ export const appUrl = (path: string): string => `${config.appUrl}${path}`;
 const dateWd = (date: string): string => `${WEEKDAYS_SHORT[dayOfWeek(date)]} ${formatDate(date)}`;
 const workingDays = (n: number): string => (n === 1 ? '1 εργάσιμη' : `${n} εργάσιμες`);
 const tMinusLabel = (n: number): string => (n === 0 ? 'T (σήμερα)' : n > 0 ? `T−${n}` : `T+${-n}`);
+/** Greek capitals carry no accent: «Προειδοποιήσεις» → «ΠΡΟΕΙΔΟΠΟΙΗΣΕΙΣ». */
+const upper = (s: string): string => s.normalize('NFD').replace(/\u0301/g, '').normalize('NFC').toUpperCase();
+const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 const clip = (s: string, max: number): string => (s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s);
 
 export function escapeHtml(s: string): string {
@@ -58,7 +61,7 @@ function toText(blocks: Block[]): string {
         out.push('');
         break;
       case 'label':
-        out.push(b.text.toUpperCase());
+        out.push(upper(b.text));
         break;
       case 'list':
         for (const item of b.items) out.push(`  • ${item.text}`);
@@ -94,7 +97,7 @@ function toHtml(blocks: Block[], preheader: string): string {
       }
       case 'label':
         parts.push(
-          `<p style="margin:10px 0 4px;font-size:12px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;color:${TONE_COLOR[b.tone ?? 'neutral']}">${escapeHtml(b.text)}</p>`,
+          `<p style="margin:10px 0 4px;font-size:12px;font-weight:bold;letter-spacing:.04em;color:${TONE_COLOR[b.tone ?? 'neutral']}">${escapeHtml(upper(b.text))}</p>`,
         );
         break;
       case 'list':
@@ -208,7 +211,11 @@ function tenderMeta(t: DigestTender): string {
   const parts = [`Υποβολή: ${dateWd(t.T)} ${t.deadlineTime} · ${tMinusLabel(t.tMinus)}`];
   if (t.nextGate) parts.push(`Επόμενη πύλη: ${gatePhrase(t.nextGate)}${t.nextGate.dueDate ? ` (${dateWd(t.nextGate.dueDate)})` : ''}`);
   if (t.team && t.team.overdueTasks + t.team.overdueHandoffs > 0) {
-    parts.push(`Ομάδα: ${t.team.overdueTasks} εκπρόθεσμα tasks, ${t.team.overdueHandoffs} εκπρόθεσμες παραδόσεις`);
+    const team = [
+      ...(t.team.overdueTasks > 0 ? [plural(t.team.overdueTasks, 'εκπρόθεσμο task', 'εκπρόθεσμα tasks')] : []),
+      ...(t.team.overdueHandoffs > 0 ? [plural(t.team.overdueHandoffs, 'εκπρόθεσμη παράδοση', 'εκπρόθεσμες παραδόσεις')] : []),
+    ];
+    parts.push(`Ομάδα: ${team.join(', ')}`);
   }
   return parts.join(' · ');
 }
@@ -245,13 +252,14 @@ export function renderDigest(digest: Digest, user: { name: string }): RenderedMa
   const { totals } = digest;
   const blocks: Block[] = [];
   blocks.push({ type: 'p', text: `Καλημέρα ${user.name},` });
-  const summary = [
-    `${totals.overdue} εκπρόθεσμα`,
-    `${totals.today} για σήμερα`,
-    `${totals.upcoming} τις επόμενες 3 εργάσιμες`,
-    ...(totals.waiting > 0 ? [`${totals.waiting} περιμένουν ενέργειά σας`] : []),
-  ].join(' · ');
-  blocks.push({ type: 'p', text: `${WEEKDAYS_LONG[dayOfWeek(digest.date)]} ${formatDate(digest.date)} — ${summary}.` });
+  const own = [
+    ...(totals.overdue > 0 ? [plural(totals.overdue, 'εκπρόθεσμο', 'εκπρόθεσμα')] : []),
+    ...(totals.today > 0 ? [`${totals.today} για σήμερα`] : []),
+    ...(totals.upcoming > 0 ? [`${totals.upcoming} τις επόμενες 3 εργάσιμες`] : []),
+    ...(totals.waiting > 0 ? [plural(totals.waiting, 'περιμένει ενέργειά σας', 'περιμένουν ενέργειά σας')] : []),
+  ];
+  const summary = own.length > 0 ? `Τα δικά σας: ${own.join(' · ')}.` : 'Δεν έχετε δικά σας εκπρόθεσμα ή επικείμενα· δείτε τις προειδοποιήσεις παρακάτω.';
+  blocks.push({ type: 'p', text: `${WEEKDAYS_LONG[dayOfWeek(digest.date)]} ${formatDate(digest.date)}. ${summary}` });
 
   for (const t of digest.tenders) {
     blocks.push({ type: 'h', text: t.authority ? `${t.title} — ${t.authority}` : t.title, meta: tenderMeta(t), url: tenderUrl(t.id) });

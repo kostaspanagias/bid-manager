@@ -22,13 +22,12 @@ import {
 
 /** Who can own a row: the tender's roles and the active users of the organization. */
 export async function loadOwners(db: ScopedDb, tenderId: string): Promise<OwnerDirectory & { roles: { key: string; name: string; user_ids: string[] }[] }> {
-  const [roles, members, users] = await Promise.all([
-    db.list<{ key: string; name: string }>('tender_role', { tender_id: tenderId }, { orderBy: 'sort, key' }),
-    db.list<{ user_id: string; tender_role_key: string | null }>('tender_member', { tender_id: tenderId }),
-    db.sql<{ id: string; name: string; email: string }>(
-      `SELECT id, name, email FROM "user" WHERE org_id = :org_id AND active AND anonymized_at IS NULL ORDER BY name, email`,
-    ),
-  ]);
+  // One after the other: this also runs inside import transactions, where all statements share a connection.
+  const roles = await db.list<{ key: string; name: string }>('tender_role', { tender_id: tenderId }, { orderBy: 'sort, key' });
+  const members = await db.list<{ user_id: string; tender_role_key: string | null }>('tender_member', { tender_id: tenderId });
+  const users = await db.sql<{ id: string; name: string; email: string }>(
+    `SELECT id, name, email FROM "user" WHERE org_id = :org_id AND active AND anonymized_at IS NULL ORDER BY name, email`,
+  );
   return {
     roles: roles.map((r) => ({ key: r.key, name: r.name, user_ids: members.filter((m) => m.tender_role_key === r.key).map((m) => m.user_id) })),
     users,
@@ -121,7 +120,7 @@ export async function listRequirements(db: ScopedDb, tenderId: string, filters: 
   let text = `SELECT ${COLUMNS}, COALESCE(c.changes, '[]'::json) AS changes
     FROM requirement r ${CHANGES_JOIN}
    WHERE ${where}
-   ORDER BY ${order}, r.id`;
+   ORDER BY ${order}, ${CODE_ORDER} NULLS LAST, r.code, r.id`;
   if (filters.limit !== undefined) {
     params.limit = filters.limit;
     params.offset = filters.offset ?? 0;
@@ -362,7 +361,9 @@ function resolveMapping(parsed: ParsedFile, given: Mapping | null | undefined): 
 async function planImport(db: ScopedDb, tenderId: string, file: { buffer: Buffer; name: string }, opts: ImportOptions, lock: boolean) {
   const parsed = await parseImportFile(file.buffer, { sheet: opts.sheet });
   const { suggested, mapping } = resolveMapping(parsed, opts.mapping);
-  const [existing, owners] = await Promise.all([lockRows(db, tenderId, undefined, lock), loadOwners(db, tenderId)]);
+  // Sequential on purpose: inside a transaction both run on the same connection.
+  const existing = await lockRows(db, tenderId, undefined, lock);
+  const owners = await loadOwners(db, tenderId);
   const plan = buildPlan({ rows: parsed.rows, rowNumbers: parsed.rowNumbers, mapping, existing: existing as ExistingRow[], owners, overwrite: Boolean(opts.overwrite) });
   return { parsed, suggested, mapping, existing, plan };
 }
