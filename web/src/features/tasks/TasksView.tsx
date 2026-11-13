@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TASK_STATUSES, type TaskStatus } from '@/api/types';
+import { useCurrentUser } from '@/features/auth/AuthProvider';
 import { StatusBadge } from '@/features/shared/StatusBadge';
 import { enumOptions } from '@/lib/enums';
 import { Badge, Button, CellActions, Checkbox, ConfirmDialog, DateText, EmptyState, Field, FilterBar, Menu, Select, Table, type Column } from '@/ui';
@@ -25,6 +26,7 @@ export function TasksView({ data, tenderId, canWrite, loading, onEdit }: Props) 
   const { t } = useTranslation('tasks');
   const { update, remove } = useTaskActions(tenderId);
   const ownerLabel = useOwnerLabel(data.roles);
+  const meId = useCurrentUser().user.id;
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'' | 'active' | TaskStatus>('active');
   const [owner, setOwner] = useState<OwnerValue>(NO_OWNER);
@@ -39,13 +41,10 @@ export function TasksView({ data, tenderId, canWrite, loading, onEdit }: Props) 
       .filter((x) => (status === '' ? true : status === 'active' ? x.status === 'open' || x.status === 'in_progress' : x.status === status))
       .filter((x) => (owner.owner_user_id ? x.owner_user_id === owner.owner_user_id : owner.owner_role_key ? x.owner_role_key === owner.owner_role_key : true))
       .filter((x) => !onlyOverdue || x.overdue)
-      .filter((x) => !onlyMine || x.owner_user_id !== null || data.me.role_keys.includes(x.owner_role_key ?? '') ? !onlyMine || isMine(x) : false)
+      .filter((x) => !onlyMine || x.owner_user_id === meId || (x.owner_role_key !== null && data.me.role_keys.includes(x.owner_role_key)))
       .filter((x) => !q || `${x.title} ${x.description ?? ''}`.toLocaleLowerCase('el').includes(q))
       .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || a.sort - b.sort);
-    function isMine(x: TaskView) {
-      return (x.owner_role_key !== null && data.me.role_keys.includes(x.owner_role_key)) || (x.owner_user_id !== null && x.owner_user_id === meId);
-    }
-  }, [all, search, status, owner, onlyOverdue, onlyMine, data.me.role_keys]);
+  }, [all, search, status, owner, onlyOverdue, onlyMine, data.me.role_keys, meId]);
 
   const filtersActive = search !== '' || status !== 'active' || owner.owner_user_id !== null || owner.owner_role_key !== null || onlyOverdue || onlyMine;
   const reset = () => {

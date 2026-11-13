@@ -181,7 +181,7 @@ describe('daily digest — who gets what', () => {
 
   it('members only hear about tenders they belong to; inactive users get nothing', async () => {
     const s = await scenario();
-    const second = await createTender(s.org, { title: 'Δεύτερος διαγωνισμός', submission_deadline_at: '2027-07-30T12:00:00Z', guarantee_valid_until: null });
+    const second = await createTender(s.org, { title: 'Δεύτερος διαγωνισμός', submission_deadline_at: '2027-07-30T12:00:00Z', guarantee_valid_until: null, compressed_mode: true });
     const db = dbFor(s.org);
     await addMember(second, s.team.outsider, 'A');
     await db.insert('task', { tender_id: second.id, title: 'Task του δεύτερου διαγωνισμού', owner_role_key: 'A', due_date: WED });
