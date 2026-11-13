@@ -126,6 +126,34 @@ export async function loadModuleJobs(): Promise<string[]> {
   return loaded;
 }
 
+/** The daily jobs may still be caught up until this hour (Athens); after it a digest would only be noise. */
+export const CATCH_UP_FROM_HOUR = 7;
+export const CATCH_UP_UNTIL_HOUR = 12;
+
+function athensHour(now: Date): number {
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: JOBS_TIMEZONE, hour: '2-digit', hourCycle: 'h23' }).format(now));
+}
+
+/**
+ * Catch-up for the 07:00 jobs: if the server was down or restarting at 07:00, or a run failed (SMTP outage), the
+ * day's run would otherwise be lost. Between 07:00 and 12:59 Athens time this runs every daily job for today; the
+ * job_run claim makes it a no-op for organizations whose run already succeeded and a retry for failed ones.
+ * Called at start-up and hourly. Returns the jobs it ran (empty outside the window).
+ */
+export async function catchUpDailyJobs(now: Date = new Date()): Promise<{ job: string; results: JobRunResult[] }[]> {
+  const hour = athensHour(now);
+  if (hour < CATCH_UP_FROM_HOUR || hour > CATCH_UP_UNTIL_HOUR) return [];
+  const out: { job: string; results: JobRunResult[] }[] = [];
+  for (const job of [...registry.values()].filter((j) => j.cronExpr === DAILY_07)) {
+    try {
+      out.push({ job: job.name, results: await runJob(job.name, { date: todayAthens(now) }) });
+    } catch (err) {
+      reportError(err, { source: 'job', job: job.name, phase: 'catch-up' });
+    }
+  }
+  return out;
+}
+
 /** Called from index.ts only (never from createApp(), so tests do not start timers). */
 export async function startJobs(): Promise<void> {
   if (tasks.length > 0) return;
@@ -145,6 +173,15 @@ export async function startJobs(): Promise<void> {
       ),
     );
   }
+  // Catch-up: hourly inside the window, and once now (a deploy or crash around 07:00 must not cost the day's digest).
+  tasks.push(
+    cron.schedule(`0 ${CATCH_UP_FROM_HOUR + 1}-${CATCH_UP_UNTIL_HOUR} * * *`, () => void catchUpDailyJobs(), {
+      timezone: JOBS_TIMEZONE,
+      name: 'daily-jobs-catch-up',
+      noOverlap: true,
+    }),
+  );
+  void catchUpDailyJobs();
   // Housekeeping that is not per-organization (so not a registered job): drop expired sessions nightly.
   tasks.push(
     cron.schedule(

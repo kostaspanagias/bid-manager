@@ -3,14 +3,14 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 // Load server/.env when present (never in tests: the test database comes from globalSetup).
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && process.env.BM_NO_DOTENV !== '1') {
   const envFile = fileURLToPath(new URL('../.env', import.meta.url));
   if (existsSync(envFile)) process.loadEnvFile(envFile);
 }
 
 const DEV_DATABASE_URL = 'postgres://bidmanager:bidmanager@127.0.0.1:5432/bidmanager_dev';
-// Fixed, public key: only ever used outside production.
-const DEV_FILE_ENCRYPTION_KEY = '6465762d6f6e6c792d6b65792d646f2d6e6f742d7573652d696e2d70726f6421';
+// Fixed, public key: used ONLY under NODE_ENV=test. Every other run must bring its own key (see the check below).
+const TEST_FILE_ENCRYPTION_KEY = '6465762d6f6e6c792d6b65792d646f2d6e6f742d7573652d696e2d70726f6421';
 
 const emptyToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
 const opt = <T extends z.ZodType>(schema: T) => z.preprocess(emptyToUndefined, schema.optional());
@@ -51,11 +51,25 @@ const schema = z
     LOG_LEVEL: opt(z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])),
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === 'production' && !env.FILE_ENCRYPTION_KEY) {
-      ctx.addIssue({ code: 'custom', path: ['FILE_ENCRYPTION_KEY'], message: 'required in production' });
-    }
     if (env.FILE_ENCRYPTION_KEY && !parseKey(env.FILE_ENCRYPTION_KEY)) {
       ctx.addIssue({ code: 'custom', path: ['FILE_ENCRYPTION_KEY'], message: 'must be 32 bytes (64 hex chars or base64)' });
+    }
+    if (env.NODE_ENV === 'production' && !env.SMTP_HOST) {
+      ctx.addIssue({ code: 'custom', path: ['SMTP_HOST'], message: 'required in production (invitations, password resets and notifications are e-mails)' });
+    }
+    if (env.NODE_ENV === 'production' && process.env.TRUST_PROXY === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TRUST_PROXY'],
+        message: 'must be set explicitly in production: the number of reverse proxies in front of the app (1 behind Caddy/nginx, 0 when exposed directly)',
+      });
+    }
+    if (env.NODE_ENV !== 'test' && !env.FILE_ENCRYPTION_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['FILE_ENCRYPTION_KEY'],
+        message: 'required — generate one with `openssl rand -hex 32` and put it in server/.env (development) or the environment (production)',
+      });
     }
     if (env.NODE_ENV === 'production' && !env.APP_URL.startsWith('https://')) {
       ctx.addIssue({ code: 'custom', path: ['APP_URL'], message: 'must be https in production' });
@@ -80,7 +94,7 @@ export const config = {
   trustProxy: env.TRUST_PROXY,
   fileStorageDir: env.FILE_STORAGE_DIR,
   /** 32-byte key for AES-256-GCM (files at rest, TOTP secrets). */
-  fileEncryptionKey: parseKey(env.FILE_ENCRYPTION_KEY ?? DEV_FILE_ENCRYPTION_KEY) as Buffer,
+  fileEncryptionKey: parseKey(env.FILE_ENCRYPTION_KEY ?? TEST_FILE_ENCRYPTION_KEY) as Buffer,
   smtp: {
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,

@@ -17,17 +17,23 @@ let transporter: Transporter | null = null;
 
 /**
  * Sends one e-mail through the configured SMTP provider. Returns true when the mail was handed to the provider and
- * false when SMTP is not configured (SMTP_HOST empty): the mail is then only logged — with its text in development,
- * without it in production, because mails carry single-use links (invitations, password resets).
+ * false when SMTP is not configured (SMTP_HOST empty — impossible in production, see config.ts): only the recipient
+ * and the subject are logged then, never the text, because mails carry single-use links (invitations, password
+ * resets) and bid details. Callers must report `false` as "not sent".
  * Throws when delivery fails — callers decide whether that matters.
  */
-export async function sendMail(mail: Mail): Promise<boolean> {
-  if (config.isTest) {
+export function sendMail(mail: Mail): Promise<boolean> {
+  return sendMailWith(mail, { isTest: config.isTest, host: config.smtp.host });
+}
+
+/** sendMail with the two switches that decide its path passed in (unit tests). */
+export async function sendMailWith(mail: Mail, mode: { isTest: boolean; host: string | undefined }): Promise<boolean> {
+  if (mode.isTest) {
     testOutbox.push(mail);
     return true;
   }
-  if (!config.smtp.host) {
-    logger.warn({ to: mail.to, subject: mail.subject, ...(config.isProd ? {} : { text: mail.text }) }, 'SMTP not configured — mail not sent');
+  if (!mode.host) {
+    logger.warn({ to: mail.to, subject: mail.subject }, 'SMTP not configured — mail not sent');
     return false;
   }
   transporter ??= nodemailer.createTransport({

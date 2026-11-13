@@ -49,12 +49,49 @@ export async function migrate(connectionString: string, options: MigrateOptions 
   return applied;
 }
 
+/**
+ * Two-role setup (hardening, review M7): migrations run as the OWNER of the schema, the application connects as a
+ * second role that can read and write data but can neither change the schema nor rewrite history — on audit_log it
+ * gets INSERT and SELECT only, so even a compromised application process cannot erase its traces (the append-only
+ * trigger stays as the first line of defence). Idempotent; run after every migration (new tables need grants).
+ */
+export async function grantAppRole(connectionString: string, role: string): Promise<void> {
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(role)) throw new Error(`Invalid role name "${role}"`);
+  const client = new pg.Client({ connectionString });
+  await client.connect();
+  try {
+    const { rows } = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role]);
+    if (rows.length === 0) throw new Error(`Role "${role}" does not exist — create it first (see ops/README.md)`);
+    await client.query('BEGIN');
+    await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
+    await client.query(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${role}`);
+    await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${role}`);
+    await client.query(`REVOKE UPDATE, DELETE ON audit_log FROM ${role}`);
+    await client.query(`REVOKE INSERT, UPDATE, DELETE ON schema_migrations FROM ${role}`);
+    await client.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${role}`);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    await client.end();
+  }
+}
+
 // CLI: npm run migrate -w server
+//   MIGRATION_DATABASE_URL  connection of the schema owner (default: DATABASE_URL — single-role setup)
+//   APP_DATABASE_ROLE       when set, the application role that gets its (restricted) grants after migrating
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { config } = await import('../config.js');
   try {
-    const applied = await migrate(config.databaseUrl, { log: (m) => console.log(m) });
+    const ownerUrl = process.env.MIGRATION_DATABASE_URL?.trim() || config.databaseUrl;
+    const applied = await migrate(ownerUrl, { log: (m) => console.log(m) });
     console.log(applied.length ? `${applied.length} migration(s) applied.` : 'Database is up to date.');
+    const appRole = process.env.APP_DATABASE_ROLE?.trim();
+    if (appRole) {
+      await grantAppRole(ownerUrl, appRole);
+      console.log(`Grants for application role "${appRole}" are in place (audit_log: INSERT + SELECT only).`);
+    }
   } catch (err) {
     console.error((err as Error).message);
     process.exit(1);

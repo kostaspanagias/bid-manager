@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { flushEvents, on } from '../../core/events.js';
 import { addMember, as, createOrg, createUser, dbFor, missingId, seedHolidays } from '../../test/harness.js';
+import { justificationLength } from './service.js';
 import { addHandoff, addRequirement, addTask, addWatchItem, createGatedTender, linkDocument, type GatedTender } from './testFactory.js';
 
-const JUST_19 = 'Δεκαεννέα χαρακτ.19'; // 19 characters
-const JUST_20 = 'Είκοσι χαρακτήρες.20'; // 20 characters
+const JUST_19 = 'Δεκαεννέα γράμματα 12'; // 19 letters or digits (spaces and punctuation do not count — review L1)
+const JUST_20 = 'Είκοσι γράμματα: 123456'; // 20 letters or digits
 const GOOD = 'Το MAF έρχεται αύριο, επιβεβαιωμένο γραπτά από τον vendor.';
 
 type Crit = { id: string; key: string; satisfied: boolean; checked_at: string | null; detail: { code: string; missing: number; items: string[] } | null };
@@ -272,8 +273,8 @@ describe('gates: decision (R11, R12)', () => {
       expect([res.status, res.body.error.code]).toEqual([422, 'justification_too_short']);
       expect(res.body.error.details).toMatchObject({ min: 20 });
     }
-    expect(JUST_19).toHaveLength(19);
-    expect(JUST_20).toHaveLength(20);
+    expect(justificationLength(JUST_19)).toBe(19);
+    expect(justificationLength(JUST_20)).toBe(20);
     expect((await db.get('gate', gateId))!.decision).toBe('pending');
     expect((await db.get('milestone', g.milestones.G1!.id))!.done_at).toBeNull();
 

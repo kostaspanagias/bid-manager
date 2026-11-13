@@ -524,6 +524,43 @@ describe('requirements — import', () => {
     expect(await codeOf(Buffer.from('\n\n  \n'))).toEqual([422, 'import_empty_file']);
     expect(await codeOf(Buffer.alloc(0))).toEqual([expect.any(Number), expect.stringMatching(/import_empty_file|import_file_required/)]);
     expect(await codeOf(Buffer.alloc(5 * 1024 * 1024 + 10, 0x61))).toEqual([413, 'import_file_too_large']);
+
+    // review M1 — a zip bomb: ~200 kB on the wire that inflates to 200 MB, with a central directory that lies
+    // about the size. Refused before the workbook is loaded, with the existing "too large" code.
+    const { deflateRawSync } = await import('node:zlib');
+    const bomb = (claimedSize: number) => {
+      const data = deflateRawSync(Buffer.alloc(200 * 1024 * 1024), { level: 9 });
+      const name = Buffer.from('xl/worksheets/sheet1.xml');
+      const local = Buffer.alloc(30);
+      local.writeUInt32LE(0x04034b50, 0);
+      local.writeUInt16LE(20, 4);
+      local.writeUInt16LE(8, 8);
+      local.writeUInt32LE(data.length, 18);
+      local.writeUInt32LE(claimedSize, 22);
+      local.writeUInt16LE(name.length, 26);
+      const central = Buffer.alloc(46);
+      central.writeUInt32LE(0x02014b50, 0);
+      central.writeUInt16LE(20, 4);
+      central.writeUInt16LE(20, 6);
+      central.writeUInt16LE(8, 10);
+      central.writeUInt32LE(data.length, 20);
+      central.writeUInt32LE(claimedSize, 24);
+      central.writeUInt16LE(name.length, 28);
+      const eocd = Buffer.alloc(22);
+      eocd.writeUInt32LE(0x06054b50, 0);
+      eocd.writeUInt16LE(1, 8);
+      eocd.writeUInt16LE(1, 10);
+      eocd.writeUInt32LE(46 + name.length, 12);
+      eocd.writeUInt32LE(30 + name.length + data.length, 16);
+      return Buffer.concat([local, name, data, central, name, eocd]);
+    };
+    const small = bomb(1000);
+    expect(small.length).toBeLessThan(1024 * 1024);
+    const heapBefore = process.memoryUsage().rss;
+    expect(await codeOf(small, 'bomb.xlsx')).toEqual([413, 'import_file_too_large']);
+    expect(await codeOf(bomb(200 * 1024 * 1024), 'bomb.xlsx')).toEqual([413, 'import_file_too_large']);
+    expect(process.memoryUsage().rss - heapBefore).toBeLessThan(150 * 1024 * 1024);
+    expect((await upload(w.api, `${w.base}/import/commit`, small, 'bomb.xlsx')).status).toBe(413);
     expect(await codeOf(csv([['Κωδικός', 'Κείμενο'], ...Array.from({ length: 5001 }, (_, i) => [`ΥΠ-${i + 1}`, 'x'])]))).toEqual([422, 'import_too_many_rows']);
     expect(await dbFor(w.org).count('requirement', { tender_id: w.tender.id })).toBe(0);
   });

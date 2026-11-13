@@ -37,7 +37,13 @@ const patchBody = z
   })
   .strict();
 
+/**
+ * Must run inside the transaction that changes the user: it locks the org's active admin rows first, so two admins
+ * demoting / deactivating each other at the same moment are serialised and the second one sees the first one's
+ * change (otherwise both checks pass and the organization is left without an admin).
+ */
 async function assertAnotherAdminRemains(ctx: Ctx, userId: string): Promise<void> {
+  await ctx.db.sql(`SELECT id FROM "user" WHERE org_id = :org_id AND org_role = 'admin' AND active ORDER BY id FOR UPDATE`);
   const admins = await ctx.db.list('user', { org_role: 'admin', active: true });
   if (!admins.some((a) => a.id !== userId)) throw unprocessable('The organization needs at least one active admin', undefined, 'last_admin');
 }

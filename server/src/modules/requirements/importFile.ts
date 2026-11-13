@@ -1,12 +1,16 @@
 // Reads an uploaded register file (CSV or XLSX) from memory into a plain grid of strings.
 // Nothing is written to disk. The format is documented in docs/register-import-format.md.
+import { inflateRawSync } from 'node:zlib';
 import { parse } from 'csv-parse/sync';
 import ExcelJS from 'exceljs';
-import { unprocessable } from '../../core/errors.js';
+import { HttpError, unprocessable } from '../../core/errors.js';
 
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 export const MAX_IMPORT_ROWS = 5000;
 const MAX_COLUMNS = 60;
+/** XLSX is a zip: the most its parts may inflate to, all together. A 5,000 × 60 sheet of long texts stays far below. */
+export const MAX_XLSX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
+const MAX_XLSX_ENTRIES = 2000;
 
 export interface ParsedFile {
   format: 'csv' | 'xlsx';
@@ -134,7 +138,60 @@ function cellText(value: ExcelJS.CellValue): string {
   return '';
 }
 
+const tooLarge = () =>
+  new HttpError(413, 'import_file_too_large', `The workbook expands to more than ${MAX_XLSX_UNCOMPRESSED_BYTES / 1024 / 1024} MB`, {
+    limitBytes: MAX_XLSX_UNCOMPRESSED_BYTES,
+  });
+
+/**
+ * Bounds the work BEFORE the workbook is handed to the XLSX library (which inflates every part into memory):
+ * walks the zip's central directory and inflates each entry itself with a hard output cap, so a "zip bomb" — a few
+ * hundred kB that expand to gigabytes, whatever sizes its headers claim — is refused after at most 64 MB of work.
+ */
+export function assertXlsxWithinBudget(buffer: Buffer): void {
+  const unreadable = () => fail('import_unreadable_file', 'The XLSX file could not be read');
+  // End of central directory: signature 0x06054b50, searched backwards (it may be followed by a comment ≤ 64 kB).
+  let eocd = -1;
+  for (let i = buffer.length - 22; i >= Math.max(0, buffer.length - 22 - 0xffff); i--) {
+    if (buffer.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) throw unreadable();
+  const entries = buffer.readUInt16LE(eocd + 10);
+  let offset = buffer.readUInt32LE(eocd + 16);
+  if (entries === 0xffff || offset === 0xffffffff) throw tooLarge(); // zip64: far beyond anything a register needs
+  if (entries > MAX_XLSX_ENTRIES) throw tooLarge();
+  let budget = MAX_XLSX_UNCOMPRESSED_BYTES;
+  for (let n = 0; n < entries; n++) {
+    if (offset + 46 > buffer.length || buffer.readUInt32LE(offset) !== 0x02014b50) throw unreadable();
+    const method = buffer.readUInt16LE(offset + 10);
+    const compressed = buffer.readUInt32LE(offset + 20);
+    const local = buffer.readUInt32LE(offset + 42);
+    const next = offset + 46 + buffer.readUInt16LE(offset + 28) + buffer.readUInt16LE(offset + 30) + buffer.readUInt16LE(offset + 32);
+    if (local + 30 > buffer.length || buffer.readUInt32LE(local) !== 0x04034b50) throw unreadable();
+    const start = local + 30 + buffer.readUInt16LE(local + 26) + buffer.readUInt16LE(local + 28);
+    if (start + compressed > buffer.length) throw unreadable();
+    if (method === 0) {
+      budget -= compressed;
+    } else if (method === 8) {
+      try {
+        budget -= inflateRawSync(buffer.subarray(start, start + compressed), { maxOutputLength: Math.max(budget, 0) + 1 }).length;
+      } catch (err) {
+        if ((err as { code?: string }).code === 'ERR_BUFFER_TOO_LARGE') throw tooLarge();
+        throw unreadable();
+      }
+    } else {
+      throw unreadable();
+    }
+    if (budget < 0) throw tooLarge();
+    offset = next;
+  }
+}
+
 async function readXlsx(buffer: Buffer, wanted: string | null): Promise<Grid> {
+  assertXlsxWithinBudget(buffer);
   const workbook = new ExcelJS.Workbook();
   try {
     await workbook.xlsx.load(buffer as unknown as ArrayBuffer);

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { unprocessable } from '../../core/errors.js';
 import { emit } from '../../core/events.js';
 import { zDate, zUuid } from '../../core/http.js';
-import { accessibleTenderIds, requireRole, requireTenderAccess } from '../../core/permissions.js';
+import { accessibleTenderIds, requireRole, requireTenderAccess, seesUserEmails } from '../../core/permissions.js';
 import type { Row } from '../../db/scoped.js';
 import { workingDaysBetween } from '../../domain/calendar.js';
 import { loadHolidays } from '../../domain/holidays.js';
@@ -268,7 +268,10 @@ router.post('/:id/status', manage, async (req, res) => {
 
 router.get('/:id/members', async (req, res) => {
   const tender = await requireTenderAccess(req.ctx, String(req.params.id), 'read');
-  res.json(await listMembers(req.ctx.db, tender.id));
+  const team = await listMembers(req.ctx.db, tender.id);
+  // a viewer (partner, external director) sees who is on the team, not their e-mail addresses
+  if (!seesUserEmails(req.ctx)) for (const m of team.items) m.user.email = null;
+  res.json(team);
 });
 
 router.put('/:id/members', manage, async (req, res) => {
@@ -338,11 +341,16 @@ router.post('/:id/deadline/preview', manage, async (req, res) => {
 
 router.post('/:id/deadline', manage, async (req, res) => {
   const { db } = req.ctx;
-  const tender = await requireTenderAccess(req.ctx, String(req.params.id), 'write');
+  const seen = await requireTenderAccess(req.ctx, String(req.params.id), 'write');
   const body = deadlineBody.parse(req.body);
-  assertOpen(tender);
+  assertOpen(seen);
 
   const result = await db.tx(async (tx) => {
+    // Two confirmations of the same extension (double click, two bid managers) must not both reschedule and both
+    // write a change entry: take the tender row lock, then judge everything on the row as it is NOW.
+    await tx.sql('SELECT id FROM tender WHERE org_id = :org_id AND id = :id FOR UPDATE', { id: seen.id });
+    const tender = (await tx.get('tender', seen.id)) ?? seen;
+    assertOpen(tender);
     const { plan, body: preview } = await previewOf({ ctx: { ...req.ctx, db: tx } }, tender, body.submission_deadline_at);
     const updated = await tx.update('tender', tender.id, {
       submission_deadline_at: body.submission_deadline_at,
@@ -372,7 +380,7 @@ router.post('/:id/deadline', manage, async (req, res) => {
     return { tender: updated ?? tender, preview, change, moved };
   });
 
-  emit(req.ctx, 'tender.extended', { tenderId: tender.id, oldT: result.preview.oldT, newT: result.preview.newT });
+  emit(req.ctx, 'tender.extended', { tenderId: seen.id, oldT: result.preview.oldT, newT: result.preview.newT });
   res.json({
     ...(await tenderDetail(req.ctx, result.tender)),
     change_entry: result.change,

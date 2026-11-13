@@ -120,3 +120,26 @@ describe('evaluateRule', () => {
     expect(evaluateRule('nope', data, null)).toMatchObject({ satisfied: false, detail: { code: 'unknown_rule' } });
   });
 });
+
+describe('R12 justification length (review L1)', () => {
+  it('counts letters and digits after NFC normalisation; padding of any kind does not count', async () => {
+    const { cleanJustification, justificationLength, MIN_JUSTIFICATION } = await import('./service.js');
+    expect(justificationLength('Εγκρίνεται με εξαίρεση: εκκρεμεί η προσφορά.')).toBeGreaterThanOrEqual(MIN_JUSTIFICATION);
+    expect(justificationLength('12345678901234567890')).toBe(20);
+    for (const padded of [
+      'ok' + ' '.repeat(40),
+      '.'.repeat(40),
+      'ok' + '\u200b'.repeat(40), // zero-width spaces
+      'ok' + '\u0301'.repeat(40), // a pile of combining accents
+      'ok\u202e' + '\u2060'.repeat(30), // bidi override + word joiners
+      '👍'.repeat(25),
+      '— – — – — – — – — – — – —',
+    ]) {
+      expect(justificationLength(padded), JSON.stringify(padded)).toBeLessThan(MIN_JUSTIFICATION);
+    }
+    // decomposed and precomposed Greek are the same text and the same length
+    const nfd = 'Αιτιολόγηση εξαίρεσης πύλης'.normalize('NFD');
+    expect(justificationLength(nfd)).toBe(justificationLength(nfd.normalize('NFC')));
+    expect(cleanJustification(`\ufeff ${nfd}\u200b `)).toBe('Αιτιολόγηση εξαίρεσης πύλης');
+  });
+});

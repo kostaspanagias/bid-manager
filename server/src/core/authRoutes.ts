@@ -12,9 +12,14 @@ import { newTotpSecret, openTotpSecret, sealTotpSecret, totpEnrolment, verifyTot
 // Mounted at /api/auth. Login is two steps: password → partial session → TOTP (or first-time TOTP enrolment)
 // → full session. There is no public sign-up: accounts are created by accepting an admin's invitation.
 
-/** Consecutive wrong passwords before the account is locked, and for how long. */
+/**
+ * Consecutive wrong passwords from one client address before THAT address is locked out of the account, and for
+ * how long. The lock is per (account, address): a stranger hammering an e-mail address cannot lock its owner out.
+ */
 export const MAX_FAILED_LOGINS = 10;
 export const LOCK_MINUTES = 15;
+/** Wrong TOTP codes per user (across sessions) before the second factor is locked for LOCK_MINUTES. */
+export const MAX_TOTP_FAILURES = 10;
 /** Wrong TOTP codes allowed per partial session before it is destroyed (password needed again). */
 export const MAX_TOTP_ATTEMPTS = 5;
 
@@ -54,6 +59,17 @@ async function meBody(active: { user: AuthUserRow }, csrfToken: string) {
   };
 }
 
+/** The second factor is locked after too many wrong codes: the partial session ends, the user waits. */
+async function assertTotpNotLocked(res: Response, active: ActiveSession): Promise<void> {
+  const until = active.user.totp_locked_until;
+  if (until && until.getTime() > Date.now()) {
+    await endSession(res, active);
+    throw new HttpError(429, 'totp_locked', 'Too many wrong codes. Try again later.', { retryAfterMinutes: Math.ceil((until.getTime() - Date.now()) / 60_000) });
+  }
+}
+
+const clientOf = (req: Request): string => (req.ip ?? 'unknown').slice(0, 100);
+
 const stageOf = (user: AuthUserRow) => (user.totp_enabled_at ? ('totp' as const) : ('totp_setup' as const));
 
 /** TOTP passed: replace the partial session with a fresh full one (new token → no session fixation). */
@@ -63,6 +79,7 @@ async function promote(req: Request, res: Response, active: ActiveSession, timeS
   await db.sql(
     `UPDATE "user"
         SET totp_last_step = :step, last_login_at = now(), failed_login_count = 0, locked_until = NULL,
+            totp_failed_count = 0, totp_locked_until = NULL,
             totp_enabled_at = CASE WHEN :enrol THEN now() ELSE totp_enabled_at END
       WHERE org_id = :org_id AND id = :id`,
     { step: timeStep, enrol, id: user.id },
@@ -80,7 +97,18 @@ async function totpFailed(res: Response, active: ActiveSession): Promise<never> 
     'UPDATE session SET totp_attempts = totp_attempts + 1 WHERE org_id = :org_id AND id = :id RETURNING totp_attempts',
     { id: active.session.id },
   );
-  if (!row || row.totp_attempts >= MAX_TOTP_ATTEMPTS) {
+  // Per user, across sessions: whoever holds the password gets MAX_TOTP_FAILURES guesses, not 5 per login.
+  const [counter] = await db.sql<{ totp_failed_count: number }>(
+    `UPDATE "user"
+        SET totp_failed_count = CASE WHEN totp_failed_count + 1 >= :max THEN 0 ELSE totp_failed_count + 1 END,
+            totp_locked_until = CASE WHEN totp_failed_count + 1 >= :max THEN now() + make_interval(mins => :mins) ELSE totp_locked_until END
+      WHERE org_id = :org_id AND id = :id
+      RETURNING totp_failed_count`,
+    { id: active.user.id, max: MAX_TOTP_FAILURES, mins: LOCK_MINUTES },
+  );
+  const lockedNow = counter?.totp_failed_count === 0;
+  if (lockedNow) await db.audit('user', active.user.id, 'totp_locked', { after: { minutes: LOCK_MINUTES } });
+  if (!row || row.totp_attempts >= MAX_TOTP_ATTEMPTS || lockedNow) {
     await endSession(res, active);
     await db.audit('user', active.user.id, 'totp_attempts_exceeded');
   }
@@ -100,23 +128,33 @@ export function authRouter(): Router {
     const { email, password } = loginBody.parse(req.body);
     const candidates = await findUsersByEmail(email);
     let matched: AuthUserRow | null = null;
-    // Unknown e-mail, inactive, locked or password-less accounts all cost one Argon2 verification and all get
+    // Unknown e-mail, inactive, locked-out or password-less accounts all cost one Argon2 verification and all get
     // the same 401, so neither the response nor its timing reveals whether an account exists.
     if (candidates.length === 0) await verifyPassword(null, password);
+    const ip = clientOf(req);
     for (const user of candidates) {
-      const locked = user.locked_until !== null && user.locked_until.getTime() > Date.now();
+      const db = scopedDb(user.org_id, null);
+      const [throttle] = await db.sql<{ locked_until: Date | null }>(
+        'SELECT locked_until FROM login_throttle WHERE org_id = :org_id AND user_id = :id AND ip = :ip',
+        { id: user.id, ip },
+      );
+      const locked = !!throttle?.locked_until && throttle.locked_until.getTime() > Date.now();
       const usable = user.active && !!user.password_hash && !locked;
       const ok = await verifyPassword(usable ? user.password_hash : null, password);
       if (ok && !matched) {
         matched = user;
+        await db.sql('DELETE FROM login_throttle WHERE org_id = :org_id AND user_id = :id AND ip = :ip', { id: user.id, ip });
       } else if (!ok && usable) {
-        await scopedDb(user.org_id, null).sql(
-          `UPDATE "user"
-              SET failed_login_count = failed_login_count + 1,
-                  locked_until = CASE WHEN failed_login_count + 1 >= :max THEN now() + make_interval(mins => :mins) ELSE locked_until END
-            WHERE org_id = :org_id AND id = :id`,
-          { id: user.id, max: MAX_FAILED_LOGINS, mins: LOCK_MINUTES },
+        // Lock this client address out of this account after MAX_FAILED_LOGINS misses; other addresses (the real
+        // owner) are not affected. failed_login_count stays as an account-wide counter for the admin to look at.
+        await db.sql(
+          `INSERT INTO login_throttle (org_id, user_id, ip, failures) VALUES (:org_id, :id, :ip, 1)
+           ON CONFLICT (org_id, user_id, ip) DO UPDATE
+              SET failures = CASE WHEN login_throttle.failures + 1 >= :max THEN 0 ELSE login_throttle.failures + 1 END,
+                  locked_until = CASE WHEN login_throttle.failures + 1 >= :max THEN now() + make_interval(mins => :mins) ELSE login_throttle.locked_until END`,
+          { id: user.id, ip, max: MAX_FAILED_LOGINS, mins: LOCK_MINUTES },
         );
+        await db.sql('UPDATE "user" SET failed_login_count = failed_login_count + 1 WHERE org_id = :org_id AND id = :id', { id: user.id });
       }
     }
     if (!matched) throw invalidCredentials();
@@ -136,6 +174,7 @@ export function authRouter(): Router {
     }
     const { user } = active;
     if (!user.totp_enabled_at || !user.totp_secret) throw new HttpError(409, 'totp_setup_required', 'Two-factor authentication is not set up yet');
+    await assertTotpNotLocked(res, active);
     const step = await verifyTotp(openTotpSecret(user.totp_secret), code, user.totp_last_step);
     if (step === null) return totpFailed(res, active);
     await promote(req, res, active, step, false);
@@ -164,6 +203,7 @@ export function authRouter(): Router {
     const { user } = active;
     if (user.totp_enabled_at) throw conflict('Two-factor authentication is already enabled', undefined, 'totp_already_enabled');
     if (!user.totp_secret) throw new HttpError(409, 'totp_setup_required', 'Start enrolment with GET /api/auth/totp/setup');
+    await assertTotpNotLocked(res, active);
     const step = await verifyTotp(openTotpSecret(user.totp_secret), code, null);
     if (step === null) return totpFailed(res, active);
     await promote(req, res, active, step, true);

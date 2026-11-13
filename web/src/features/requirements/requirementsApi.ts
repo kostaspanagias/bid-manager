@@ -49,7 +49,7 @@ export interface OwnerRole {
 export interface OwnerUser {
   id: ID;
   name: string;
-  email: string;
+  email: string | null;
 }
 export interface Owners {
   roles: OwnerRole[];

@@ -55,6 +55,33 @@ export async function accessibleTenderIds(ctx: PermCtx): Promise<string[] | null
 }
 
 /**
+ * The user directory a caller may see (GDPR: names and e-mails of colleagues are personal data).
+ * admin / bid_manager: everybody (`null`). Everyone else: themselves, the people they share a tender with, and —
+ * once they are on at least one tender — the admins and bid managers, who reach every tender and show up as
+ * owners, approvers and authors there. Someone with no tender sees only themselves.
+ */
+export async function visibleUserIds(ctx: PermCtx): Promise<Set<string> | null> {
+  if (seesAllTenders(ctx)) return null;
+  const rows = await ctx.db.sql<{ user_id: string }>(
+    `SELECT DISTINCT other.user_id
+       FROM tender_member mine
+       JOIN tender_member other ON other.org_id = mine.org_id AND other.tender_id = mine.tender_id
+      WHERE mine.org_id = :org_id AND mine.user_id = :me
+     UNION
+     SELECT u.id FROM "user" u
+      WHERE u.org_id = :org_id AND u.org_role IN ('admin', 'bid_manager')
+        AND EXISTS (SELECT 1 FROM tender_member m WHERE m.org_id = :org_id AND m.user_id = :me)`,
+    { me: ctx.user.id },
+  );
+  return new Set([ctx.user.id, ...rows.map((r) => r.user_id)]);
+}
+
+/** Whether the caller gets e-mail addresses in directories: a viewer (partner, external director) never does. */
+export function seesUserEmails(ctx: PermCtx): boolean {
+  return ctx.user.org_role !== 'viewer';
+}
+
+/**
  * R18 — who may see the financial-offer files of a tender: admin, bid_manager, approvers who are members of the
  * tender, and members holding a tender role whose payload.financial is true. A viewer never.
  * Check it on the backend for every list/download of `file.confidentiality = 'financial'`.

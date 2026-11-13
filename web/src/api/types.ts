@@ -104,11 +104,14 @@ export type FileConfidentiality = (typeof FILE_CONFIDENTIALITIES)[number];
 // is typed next to the endpoint that returns it, in the feature's own *Api.ts (the server returns joined/computed
 // views there, not table rows).
 
-/** Minimal user as returned by GET /api/users and embedded in other payloads. */
+/**
+ * A user as returned by GET /api/users: for admin / bid manager every active user, for everyone else only the
+ * people they share a tender with. `email` is null for a viewer (except their own).
+ */
 export interface UserRef {
   id: ID;
   name: string;
-  email: string;
+  email: string | null;
   org_role: OrgRole;
 }
 

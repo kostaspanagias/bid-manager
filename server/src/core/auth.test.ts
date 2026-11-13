@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { anon, as, createOrg, createUser, dbFor, getApp, type Agent, type TestUser } from '../test/harness.js';
 import request from 'supertest';
 import { SESSION_COOKIE } from './auth.js';
-import { MAX_FAILED_LOGINS, MAX_TOTP_ATTEMPTS } from './authRoutes.js';
+import { createApp } from '../app.js';
+import { MAX_FAILED_LOGINS, MAX_TOTP_ATTEMPTS, MAX_TOTP_FAILURES } from './authRoutes.js';
 import { sha256Hex } from './crypto.js';
 import { testOutbox } from './mailer.js';
 
@@ -128,23 +129,75 @@ describe('login: password, then mandatory TOTP', () => {
     expect((await anon().post('/api/auth/login').set('Content-Type', 'application/json').send('{oops')).body.error.code).toBe('invalid_json');
   });
 
-  it('locks the account after repeated failures — without revealing it', async () => {
+  it('repeated wrong passwords lock that client address out of the account — without revealing it, and without locking the owner out (review M5)', async () => {
     const org = await createOrg();
     const user = await createUser(org, 'member', { password: PASSWORD });
+    // an app that trusts one proxy hop, so the test can speak from different client addresses
+    const proxied = createApp();
+    proxied.set('trust proxy', 1);
+    const from = (ip: string, password = PASSWORD) => request(proxied).post('/api/auth/login').set('X-Forwarded-For', ip).send({ email: user.email, password });
+
     for (let i = 0; i < MAX_FAILED_LOGINS; i++) {
-      expect((await login(anon(), user, 'wrong password 123')).status).toBe(401);
+      expect((await from('203.0.113.7', 'wrong password 123')).status).toBe(401);
     }
     const row = await dbFor(org).get('user', user.id);
     expect(row?.failed_login_count).toBe(MAX_FAILED_LOGINS);
-    expect(row?.locked_until.getTime()).toBeGreaterThan(Date.now());
-    const locked = await login(anon(), user); // correct password, but locked
-    expect(locked.status).toBe(401);
-    expect(locked.body.error.code).toBe('invalid_credentials');
+    expect(row?.locked_until).toBeNull(); // the ACCOUNT is not locked
+    const throttle = await dbFor(org).findOne('login_throttle', { user_id: user.id, ip: '203.0.113.7' });
+    expect(throttle?.locked_until.getTime()).toBeGreaterThan(Date.now());
 
-    await dbFor(org).sql('UPDATE "user" SET locked_until = now() - interval \'1 second\' WHERE org_id = :org_id AND id = :id', { id: user.id });
+    // the attacker's address is locked out, even with the right password, and gets the same answer as before
+    const locked = await from('203.0.113.7');
+    expect([locked.status, locked.body.error.code]).toEqual([401, 'invalid_credentials']);
+    // the owner, from their own address, logs in as usual
+    const owner = await from('198.51.100.20');
+    expect([owner.status, owner.body.stage]).toEqual([200, 'totp']);
+
+    // the lock expires; a successful login clears the throttle and the counter
+    await dbFor(org).sql("UPDATE login_throttle SET locked_until = now() - interval '1 second' WHERE org_id = :org_id AND user_id = :id", { id: user.id });
+    expect((await from('203.0.113.7')).status).toBe(200);
+    expect(await dbFor(org).count('login_throttle', { user_id: user.id, ip: '203.0.113.7' })).toBe(0);
     const { agent } = await fullLogin(user);
     expect((await agent.get('/api/users')).status).toBe(200);
     expect((await dbFor(org).get('user', user.id))?.failed_login_count).toBe(0);
+  });
+
+  it('wrong TOTP codes are counted per user across logins: after 10 the second factor is locked, a success resets the count (review M5)', async () => {
+    const org = await createOrg();
+    const user = await createUser(org, 'member', { password: PASSWORD });
+    const wrong = async (n: number) => {
+      // each login allows MAX_TOTP_ATTEMPTS codes; keep logging in again, as somebody who knows the password would
+      let sent = 0;
+      while (sent < n) {
+        const agent = anon();
+        expect((await login(agent, user)).status).toBe(200);
+        for (let i = 0; i < MAX_TOTP_ATTEMPTS && sent < n; i++, sent++) {
+          const res = await agent.post('/api/auth/totp').send({ code: '000000' });
+          expect(res.status).toBe(401);
+        }
+      }
+    };
+    await wrong(4);
+    expect((await dbFor(org).get('user', user.id))?.totp_failed_count).toBe(4);
+    // a correct code resets the counter
+    await fullLogin(user);
+    expect(await dbFor(org).get('user', user.id)).toMatchObject({ totp_failed_count: 0, totp_locked_until: null });
+
+    await wrong(MAX_TOTP_FAILURES);
+    const row = await dbFor(org).get('user', user.id);
+    expect(row?.totp_locked_until.getTime()).toBeGreaterThan(Date.now());
+    // locked: even the right code is refused, with a distinct answer, and the partial session ends
+    const agent = anon();
+    await login(agent, user);
+    const res = await agent.post('/api/auth/totp').send({ code: await code(user.totpSecret!, 1) });
+    expect([res.status, res.body.error.code]).toEqual([429, 'totp_locked']);
+    expect((await agent.get('/api/auth/me')).status).toBe(401);
+    expect((await dbFor(org).list('audit_log', { entity_id: user.id })).map((a) => a.action)).toContain('totp_locked');
+    // after the lock the user is back in
+    await dbFor(org).sql('UPDATE "user" SET totp_locked_until = now() - interval \'1 second\' WHERE org_id = :org_id AND id = :id', { id: user.id });
+    const back = anon();
+    await login(back, user);
+    expect((await back.post('/api/auth/totp').send({ code: await code(user.totpSecret!, 1) })).status).toBe(200);
   });
 
   it('a TOTP code cannot be replayed, and too many wrong codes end the partial session', async () => {
@@ -426,6 +479,8 @@ describe('cookie flags in production', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('APP_URL', 'https://bids.example.com');
     vi.stubEnv('FILE_ENCRYPTION_KEY', 'a'.repeat(64));
+    vi.stubEnv('SMTP_HOST', 'smtp.example.com');
+    vi.stubEnv('TRUST_PROXY', '1');
     try {
       const { config } = await import('../config.js');
       expect(config.isProd).toBe(true);

@@ -1,6 +1,7 @@
 // Infrastructure for the end-to-end run: a private database, a real server serving the built web app, and small
 // Playwright helpers. No API mocking anywhere.
 import { spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
@@ -54,6 +55,8 @@ export async function startStack({ build = false } = {}) {
     SEED_ADMIN_PASSWORD: ADMIN.password,
     SEED_ORG_NAME: 'Active Computer Systems (e2e)',
     SMTP_HOST: '',
+    FILE_ENCRYPTION_KEY: randomBytes(32).toString('hex'),
+    BM_NO_DOTENV: '1',
     LOG_LEVEL: 'info',
   };
   if (build || !existsSync(resolve(repoRoot, 'web', 'dist', 'index.html'))) {
@@ -195,8 +198,8 @@ export async function scanText(page, where) {
 /** Password + TOTP login through the real pages. Enrols TOTP when the account has none yet. Returns the secret. */
 export async function login(page, { email, password, secret }) {
   await page.goto(`${BASE}/login`);
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Κωδικός', { exact: true }).fill(password);
+  await page.locator('input[name=email]').fill(email);
+  await page.locator('input[name=password]').fill(password);
   await page.getByRole('button', { name: 'Συνέχεια' }).click();
   const code = page.getByLabel('Κωδικός 6 ψηφίων');
   await code.waitFor();
@@ -263,4 +266,10 @@ export function fridayAfter(from, minDays) {
   let d = addDays(from, minDays);
   while (new Date(`${d}T00:00:00Z`).getUTCDay() !== 5) d = addDays(d, 1);
   return d;
+}
+
+/** A form control by its exact visible label (required fields carry a trailing " *"). */
+export function f(scope, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return scope.getByLabel(new RegExp(`^\\s*${escaped}(\\s*\\*)?\\s*$`));
 }

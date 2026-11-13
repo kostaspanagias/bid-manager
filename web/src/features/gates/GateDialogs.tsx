@@ -177,7 +177,8 @@ export function DecisionDialog({ gate, onClose, onSaved }: DialogProps) {
   const unmet = gate.criteria.filter((c) => !c.satisfied);
   const hasUnmet = unmet.length > 0;
   const goNoGo = gate.decision_mode === 'go_no_go';
-  const length = justification.trim().length;
+  // the server's rule (R12): NFC, invisible characters and accents-only padding dropped, letters and digits counted
+  const length = (justification.normalize('NFC').replace(/[\p{Cf}\p{M}]/gu, '').match(/[\p{L}\p{N}]/gu) ?? []).length;
   const needsJustification = decision !== null && (decision === 'approved' ? false : decision === 'go' ? hasUnmet : true);
   const justificationOk = !needsJustification || length >= MIN_JUSTIFICATION;
   const noGo = decision === 'no_go';

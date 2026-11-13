@@ -307,8 +307,7 @@ router.patch('/:id', async (req, res) => {
     const rewires =
       (body.handoff_from_role !== undefined && body.handoff_from_role !== task.handoff_from_role) ||
       (body.handoff_to_role !== undefined && body.handoff_to_role !== task.handoff_to_role) ||
-      (body.milestone_id !== undefined && body.milestone_id !== (task.milestone_id ?? null)) ||
-      (body.due_date !== undefined && body.due_date !== (task.due_date ?? null));
+      (body.milestone_id !== undefined && body.milestone_id !== (task.milestone_id ?? null));
     if (rewires) throw forbidden('Only the bid manager can change the roles, milestone or date of a handoff', 'handoff_manager_only');
   }
 
@@ -321,6 +320,9 @@ router.patch('/:id', async (req, res) => {
     const linked = task.milestone_id ? await db.get('milestone', task.milestone_id) : null;
     if (task.section === 'handoff' && linked?.kind === 'handoff') {
       throw unprocessable('The date of this handoff follows the schedule: change the milestone instead', undefined, 'handoff_date_from_schedule');
+    }
+    if (task.section === 'handoff' && !isManager(req.ctx)) {
+      throw forbidden('Only the bid manager can change the roles, milestone or date of a handoff', 'handoff_manager_only');
     }
     patch.due_date = body.due_date;
   }

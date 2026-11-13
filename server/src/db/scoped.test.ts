@@ -279,7 +279,7 @@ describe('scoped data layer — audit log', () => {
     expect(text).not.toContain('SECRET-1');
     expect(text).not.toContain('TOKEN-HASH');
     const create = log.find((l) => l.entity === 'user' && l.action === 'create');
-    expect(create?.after).toMatchObject({ email: 'redact@example.com', password_hash: REDACTED, totp_secret: REDACTED });
+    expect(create?.after).toMatchObject({ password_hash: REDACTED, totp_secret: REDACTED });
     const update = log.find((l) => l.entity === 'user' && l.action === 'update');
     expect(update?.before).toEqual({ password_hash: REDACTED, totp_secret: REDACTED });
     expect(update?.after).toEqual({ password_hash: REDACTED, totp_secret: null });
@@ -308,6 +308,29 @@ describe('scoped data layer — audit log', () => {
     await db.audit('gate', missingId(), 'decide', { before: { decision: 'pending' }, after: { decision: 'approved_with_exception', token_hash: 'x' }, tenderId: tender.id });
     const row = await db.findOne('audit_log', { action: 'decide' });
     expect(row).toMatchObject({ entity: 'gate', user_id: user.id, tender_id: tender.id, before: { decision: 'pending' }, after: { decision: 'approved_with_exception', token_hash: REDACTED } });
+  });
+
+  it('personal data of users and invitations never reaches the audit log — ids and field names only (review M2)', async () => {
+    const org = await createOrg();
+    const db = dbFor(org);
+    const user = await db.insert('user', { email: 'maria.personal@example.com', name: 'Μαρία Προσωπική', org_role: 'member' });
+    await db.update('user', user.id, { name: 'Μαρία Νέα-Προσωπική', email: 'maria.new@example.com', org_role: 'viewer' });
+    const inv = await db.insert('invitation', { email: 'invited.personal@example.com', org_role: 'member', token_hash: 'h', expires_at: new Date(Date.now() + 1000) });
+    await db.remove('invitation', inv.id);
+    await db.audit('user', user.id, 'custom', { after: { ip: '10.1.2.3', user_agent: 'Firefox', to_email: 'x@personal.example.com', note: 'kept' } });
+    await db.remove('user', user.id);
+    const rows = await db.list('audit_log', {}, { orderBy: 'at, id' });
+    const text = JSON.stringify(rows);
+    for (const secret of ['maria.personal', 'maria.new', 'Προσωπική', 'invited.personal', '10.1.2.3', 'Firefox', 'personal.example.com']) {
+      expect(text, secret).not.toContain(secret);
+    }
+    const update = rows.find((r) => r.entity === 'user' && r.action === 'update');
+    expect(update).toMatchObject({ entity_id: user.id, before: { name: REDACTED, email: REDACTED, org_role: 'member' }, after: { name: REDACTED, email: REDACTED, org_role: 'viewer' } });
+    expect(rows.find((r) => r.action === 'custom')?.after).toEqual({ ip: REDACTED, user_agent: REDACTED, to_email: REDACTED, note: 'kept' });
+    expect(rows.find((r) => r.entity === 'invitation' && r.action === 'create')?.after).toMatchObject({ id: inv.id, email: REDACTED, org_role: 'member' });
+    // other entities keep their (non-personal) names
+    const tender = await createTender(org, { title: 'Τίτλος διαγωνισμού' });
+    expect(JSON.stringify(await db.list('audit_log', { entity: 'tender', entity_id: tender.id }))).toContain('Τίτλος διαγωνισμού');
   });
 
   it('audit_log is append-only: UPDATE and DELETE are rejected by the database', async () => {

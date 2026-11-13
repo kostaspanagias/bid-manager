@@ -69,7 +69,8 @@ export function toErrorResponse(err: unknown): { status: number; body: ErrorBody
     if (e.code === '23503') return pg(409, 'conflict', 'The record is referenced by, or references, another record');
     if (e.code === '23514') return pg(422, 'business_rule', 'The change violates a data rule');
     if (e.code === '23502') return pg(400, 'validation_error', 'A required field is missing');
-    if (e.code === '22P02' || e.code === '22007' || e.code === '22008' || e.code === '22003') {
+    // 22021 / 22P05: a NUL character (or an invalid byte sequence) in a text value — bad input, not a server fault
+    if (e.code === '22P02' || e.code === '22007' || e.code === '22008' || e.code === '22003' || e.code === '22021' || e.code === '22P05') {
       return pg(400, 'validation_error', 'A value has an invalid format');
     }
   }

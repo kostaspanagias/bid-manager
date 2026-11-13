@@ -129,6 +129,7 @@ export async function executeErasure(db: ScopedDb, target: Target, plan: ErasePl
         `UPDATE "user"
             SET name = :name, email = :email, active = false, password_hash = NULL, totp_secret = NULL,
                 totp_enabled_at = NULL, totp_last_step = NULL, failed_login_count = 0, locked_until = NULL,
+                totp_failed_count = 0, totp_locked_until = NULL,
                 last_login_at = NULL, settings = '{}'::jsonb, anonymized_at = now()
           WHERE org_id = :org_id AND id = :id`,
         { id: user.id, name: ERASED_USER_NAME, email: erasedEmail(user.id) },
@@ -140,6 +141,7 @@ export async function executeErasure(db: ScopedDb, target: Target, plan: ErasePl
       await tx.sql('DELETE FROM session WHERE org_id = :org_id AND user_id = :id', { id: user.id });
       await tx.sql('DELETE FROM invitation WHERE org_id = :org_id AND (email = :email OR accepted_user_id = :id)', { id: user.id, email: user.email });
       await tx.sql('DELETE FROM password_reset WHERE org_id = :org_id AND user_id = :id', { id: user.id });
+      await tx.sql('DELETE FROM login_throttle WHERE org_id = :org_id AND user_id = :id', { id: user.id });
       await tx.sql(`UPDATE email_log SET to_email = NULL, subject = '', body = '' WHERE org_id = :org_id AND (user_id = :id OR to_email = :email)`, {
         id: user.id,
         email: user.email,

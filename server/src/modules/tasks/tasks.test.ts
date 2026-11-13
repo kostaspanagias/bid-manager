@@ -308,6 +308,38 @@ describe('handoffs (F6): deliver → receive', () => {
   });
 });
 
+describe('handoffs — re-wiring is the bid manager\'s (review H1)', () => {
+  it('a member cannot change from/to role, milestone or date of a handoff — and so cannot make themselves its recipient', async () => {
+    const s = await setup();
+    const { task } = await s.handoff(); // B → A
+    const other = await s.db.insert('milestone', { tender_id: s.tender.id, key: 'MX', name: 'Άλλο', kind: 'milestone', due_date: '2027-06-30' });
+    const manual = await s.db.insert('task', { tender_id: s.tender.id, title: 'Χειροκίνητο handoff', section: 'handoff', handoff_from_role: 'A', handoff_to_role: 'C', due_date: '2027-04-20' });
+    const b = await as(s.b);
+    for (const [id, patch] of [
+      [task.id, { handoff_to_role: 'B', handoff_from_role: 'A' }],
+      [task.id, { handoff_to_role: 'C' }],
+      [task.id, { handoff_from_role: 'C' }],
+      [task.id, { milestone_id: other.id }],
+      [task.id, { milestone_id: null }],
+      [manual.id, { due_date: '2027-12-31' }],
+      [manual.id, { due_date: null }],
+      [manual.id, { handoff_to_role: 'B' }],
+    ] as const) {
+      const res = await b.patch(`${s.url}/${id}`).send(patch);
+      expect([JSON.stringify(patch), res.status, res.body.error?.code]).toEqual([JSON.stringify(patch), 403, 'handoff_manager_only']);
+    }
+    expect(await s.db.get('task', task.id)).toMatchObject({ handoff_from_role: 'B', handoff_to_role: 'A', due_date: '2027-04-23' });
+    expect(await s.db.get('task', manual.id)).toMatchObject({ handoff_to_role: 'C', due_date: '2027-04-20' });
+    // B (the sender) still cannot confirm receipt of their own handoff
+    expect((await b.post(`${s.url}/${task.id}/receive`).send({})).status).toBe(403);
+    // harmless edits stay open to members; unchanged values are not a re-wiring
+    expect((await b.patch(`${s.url}/${task.id}`).send({ description: 'σημείωση', handoff_to_role: 'A', due_date: '2027-04-23' })).status).toBe(200);
+    // the bid manager re-wires
+    const ok = await as(s.manager).patch(`${s.url}/${manual.id}`).send({ handoff_to_role: 'B', due_date: '2027-04-21' });
+    expect([ok.status, ok.body.handoff_to_role ?? ok.body.handoff?.to_role, ok.body.due_date]).toEqual([200, 'B', '2027-04-21']);
+  });
+});
+
 describe('tasks — access', () => {
   it('viewer is read-only; a non-member gets 403', async () => {
     const s = await setup();

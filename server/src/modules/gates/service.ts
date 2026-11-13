@@ -10,6 +10,19 @@ import { athensDate } from '../../domain/time.js';
 import { evaluateRule, loadRuleData, type RuleDetail } from './rules.js';
 
 export const MIN_JUSTIFICATION = 20;
+
+/** The justification as stored: NFC, without invisible format characters (zero-width joiners, bidi marks, BOM …). */
+export function cleanJustification(text: string | null | undefined): string {
+  return (text ?? '').normalize('NFC').replace(/\p{Cf}/gu, '').trim();
+}
+
+/**
+ * R12 counts what a reader can read: letters and digits. Spaces, punctuation, emoji, combining marks and invisible
+ * characters do not make a justification longer.
+ */
+export function justificationLength(text: string | null | undefined): number {
+  return (cleanJustification(text).replace(/\p{M}/gu, '').match(/[\p{L}\p{N}]/gu) ?? []).length;
+}
 export const CLOSED_STATUSES: readonly string[] = ['submitted', 'no_go', 'cancelled'];
 export const DECISIONS_BY_MODE: Record<string, readonly string[]> = {
   approval: ['approved', 'approved_with_exception', 'rejected'],
@@ -280,7 +293,8 @@ export async function decideGate(
   input: { decision: string; justification?: string | null },
 ): Promise<DecisionResult> {
   const { user } = ctx;
-  const justification = (input.justification ?? '').trim();
+  const justification = cleanJustification(input.justification);
+  const length = justificationLength(justification);
   let cancelledTasks = 0;
   let tenderStatus = String(tender.status);
 
@@ -299,8 +313,8 @@ export async function decideGate(
     const unmetDetails = { unmet: unmet.map((c) => ({ id: c.id, key: c.key, text: c.text, type: c.type, auto_rule: c.auto_rule, detail: c.detail })) };
     const tooShort = () =>
       unprocessable(
-        `A justification of at least ${MIN_JUSTIFICATION} characters is required`,
-        { min: MIN_JUSTIFICATION, length: justification.length, ...unmetDetails },
+        `A justification of at least ${MIN_JUSTIFICATION} letters or digits is required`,
+        { min: MIN_JUSTIFICATION, length, ...unmetDetails },
         'justification_too_short',
       );
     const positive = POSITIVE.has(input.decision);
@@ -314,12 +328,12 @@ export async function decideGate(
         if (justification === '') {
           throw unprocessable('Exit criteria are not met: Go is possible only as an exception with a justification', unmetDetails, 'criteria_unmet');
         }
-        if (justification.length < MIN_JUSTIFICATION) throw tooShort();
+        if (length < MIN_JUSTIFICATION) throw tooShort();
         exception = true;
       }
     } else {
       // approved_with_exception, rejected, no_go
-      if (justification.length < MIN_JUSTIFICATION) throw tooShort();
+      if (length < MIN_JUSTIFICATION) throw tooShort();
       exception = input.decision === 'approved_with_exception';
     }
 

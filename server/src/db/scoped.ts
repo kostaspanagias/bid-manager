@@ -47,9 +47,19 @@ export interface ScopedDb {
 }
 
 /** Tables whose writes are not audited automatically. */
-export const NO_AUDIT_TABLES: ReadonlySet<string> = new Set(['audit_log', 'session', 'job_run', 'email_log']);
+export const NO_AUDIT_TABLES: ReadonlySet<string> = new Set(['audit_log', 'session', 'job_run', 'email_log', 'login_throttle']);
 /** Columns never written to audit_log in clear. */
 export const REDACTED_COLUMNS: ReadonlySet<string> = new Set(['password_hash', 'totp_secret', 'token_hash']);
+/**
+ * Personal data that must not be copied into the append-only audit log (it could never be erased there — GDPR):
+ * the audit row keeps the id of the user / invitation and WHICH field changed, not the value.
+ */
+export const PERSONAL_COLUMNS: Readonly<Record<string, ReadonlySet<string>>> = {
+  user: new Set(['name', 'email']),
+  invitation: new Set(['email']),
+};
+/** Redacted on every entity. */
+export const PERSONAL_COLUMNS_ANYWHERE: ReadonlySet<string> = new Set(['ip', 'user_agent', 'to_email']);
 export const REDACTED = '[redacted]';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -316,8 +326,8 @@ class Scoped implements ScopedDb {
         entityId,
         isUuid(data.tenderId) ? data.tenderId : null,
         action,
-        toAuditJson(data.before),
-        toAuditJson(data.after),
+        toAuditJson(entity, data.before),
+        toAuditJson(entity, data.after),
       ],
     );
   }
@@ -335,7 +345,7 @@ class Scoped implements ScopedDb {
       const values: unknown[] = [];
       const tuples = entries.slice(i, i + chunk).map((e) => {
         const tenderId = e.entity === 'tender' ? e.row.id : isUuid(e.row.tender_id) ? e.row.tender_id : null;
-        values.push(this.orgId, this.userId, e.entity, e.row.id == null ? null : String(e.row.id), tenderId, e.action, toAuditJson(e.before), toAuditJson(e.after));
+        values.push(this.orgId, this.userId, e.entity, e.row.id == null ? null : String(e.row.id), tenderId, e.action, toAuditJson(e.entity, e.before), toAuditJson(e.entity, e.after));
         const n = values.length;
         return `($${n - 7}, $${n - 6}, $${n - 5}, $${n - 4}, $${n - 3}, $${n - 2}, $${n - 1}, $${n})`;
       });
@@ -393,17 +403,18 @@ function orderBy(table: string, cols: TableSchema, spec: string): string {
     .join(', ');
 }
 
-function redact(value: unknown): unknown {
+function redact(entity: string, value: unknown): unknown {
   if (value === null || typeof value !== 'object' || Array.isArray(value) || value instanceof Date) return value;
+  const personal = PERSONAL_COLUMNS[entity];
   const out: Row = {};
   for (const [k, v] of Object.entries(value as Row)) {
-    out[k] = REDACTED_COLUMNS.has(k) && v != null ? REDACTED : v;
+    out[k] = (REDACTED_COLUMNS.has(k) || PERSONAL_COLUMNS_ANYWHERE.has(k) || personal?.has(k)) && v != null ? REDACTED : v;
   }
   return out;
 }
 
-function toAuditJson(value: unknown): string | null {
-  return value === undefined || value === null ? null : JSON.stringify(redact(value));
+function toAuditJson(entity: string, value: unknown): string | null {
+  return value === undefined || value === null ? null : JSON.stringify(redact(entity, value));
 }
 
 /**

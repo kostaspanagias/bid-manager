@@ -92,7 +92,7 @@ export interface ScheduleState {
  * The scheduler's input for a tender: rules from the template snapshot (condition-filtered by the tender's flags);
  * milestones the snapshot does not know fall back to the rule stored in their own `computed_from`.
  */
-export async function loadScheduleState(db: ScopedDb, tender: Row, holidays?: Holidays): Promise<ScheduleState> {
+export async function loadScheduleState(db: ScopedDb, tender: Row, holidays?: Holidays, dates: readonly (string | null)[] = []): Promise<ScheduleState> {
   const milestones = await loadMilestones(db, tender.id);
   const snapshot = snapshotOf(tender);
   const items = snapshot ? toScheduleItems(snapshot.items, { has_demo: Boolean(tender.has_demo), has_partners: Boolean(tender.has_partners) }) : [];
@@ -111,7 +111,7 @@ export async function loadScheduleState(db: ScopedDb, tender: Row, holidays?: Ho
     done: isDone(m),
     needs_review: m.needs_review,
   }));
-  return { holidays: holidays ?? (await loadHolidays(db)), items, milestones, current };
+  return { holidays: holidays ?? (await loadHolidays(db, dates)), items, milestones, current };
 }
 
 export interface ReschedulePlan {
@@ -131,7 +131,7 @@ export async function planReschedule(
   tender: Row,
   opts: { T?: string; T0?: string | null; flagManual: boolean; today?: string; holidays?: Holidays; compressed?: boolean },
 ): Promise<ReschedulePlan> {
-  const state = await loadScheduleState(db, tender, opts.holidays);
+  const state = await loadScheduleState(db, tender, opts.holidays, [opts.T ?? null, opts.T0 ?? null]);
   const dates = tenderDates(tender);
   const T = opts.T ?? dates.T;
   const T0 = opts.T0 === undefined ? dates.T0 : opts.T0;

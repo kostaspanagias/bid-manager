@@ -10,7 +10,7 @@ const SPEC_TABLES = [
   'organization', 'user', 'holiday', 'template', 'template_item', 'tender', 'tender_member', 'milestone', 'gate',
   'gate_criterion', 'requirement', 'task', 'watch_item', 'risk', 'change_entry', 'company_document', 'file', 'lesson', 'audit_log',
 ];
-const EXTRA_TABLES = ['session', 'invitation', 'password_reset', 'tender_role', 'tender_document', 'change_entry_requirement', 'job_run', 'email_log'];
+const EXTRA_TABLES = ['session', 'invitation', 'password_reset', 'login_throttle', 'tender_role', 'tender_document', 'change_entry_requirement', 'job_run', 'email_log'];
 
 async function columns(): Promise<Map<string, Map<string, { nullable: boolean; type: string }>>> {
   const { rows } = await getPool().query(

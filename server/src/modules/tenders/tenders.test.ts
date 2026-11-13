@@ -724,6 +724,21 @@ describe('deadline extension (R9, R10)', () => {
     expect(ext.body.change_entry.id).toBe(changes[0]?.id);
   });
 
+  it('two concurrent confirmations of the same extension: one wins, the other is refused as unchanged — one change entry (review M6)', async () => {
+    const w = await world();
+    const res = await create(w);
+    const id = res.tender.id as string;
+    const api = await as(w.admin);
+    const other = await as(await createUser(w.org, 'bid_manager'));
+    const send = (a: typeof api) => a.post(`/api/tenders/${id}/deadline`).send({ submission_deadline_at: NEW, source: 'esidis' });
+    const results = await Promise.all([send(api), send(other), send(api), send(other)]);
+    await flushEvents();
+    expect(results.map((r) => r.status).sort()).toEqual([200, 422, 422, 422]);
+    for (const r of results.filter((x) => x.status === 422)) expect(r.body.error.code).toBe('deadline_unchanged');
+    expect(await dbFor(w.org).count('change_entry', { tender_id: id, kind: 'extension' })).toBe(1);
+    expect((await dates(w, id)).G4).toBe('2027-05-12');
+  });
+
   it('re-evaluates compressed mode; accepts a description; rejects an unchanged or inconsistent deadline', async () => {
     const w = await world();
     const res = await create(w, { t0_published_at: '2027-04-19', questions_deadline_at: null });

@@ -45,6 +45,8 @@ export async function pingDatabase(timeoutMs = 2000): Promise<boolean> {
 
 /** Housekeeping: drop expired sessions of every org. Returns how many were removed. */
 export async function purgeExpiredSessions(): Promise<number> {
+  // login throttles that have neither an active lock nor recent failures go with them (nightly housekeeping)
+  await getPool().query("DELETE FROM login_throttle WHERE COALESCE(locked_until, updated_at) < now() - interval '1 day'");
   return (await getPool().query('DELETE FROM session WHERE expires_at < now()')).rowCount ?? 0;
 }
 

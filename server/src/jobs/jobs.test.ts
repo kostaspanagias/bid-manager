@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createOrg, dbFor } from '../test/harness.js';
-import { clearJobs, DAILY_07, JOBS_TIMEZONE, loadModuleJobs, registeredJobs, registerJob, runJob } from './index.js';
+import { catchUpDailyJobs, clearJobs, DAILY_07, JOBS_TIMEZONE, loadModuleJobs, registeredJobs, registerJob, runJob } from './index.js';
 
 beforeEach(() => clearJobs());
 
@@ -112,5 +112,42 @@ describe('runJob — at most once per org per date, every execution logged', () 
     const [res] = await runJob('t-today', { orgId: org.id });
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Athens' }).format(new Date());
     expect(res?.detail).toEqual({ runDate: today });
+  });
+});
+
+describe('catchUpDailyJobs — a missed or failed 07:00 run is made up for (review M8)', () => {
+  it('runs the daily jobs for today inside 07:00–12:59 Athens, retries failures, never repeats a success, and does nothing outside the window', async () => {
+    const org = await createOrg();
+    let calls = 0;
+    let fail = true;
+    registerJob('t-catch-up', DAILY_07, async ({ orgId }) => {
+      if (orgId !== org.id) return null;
+      calls++;
+      if (fail) throw new Error('smtp down');
+      return { sent: 1 };
+    });
+    registerJob('t-not-daily', '15 3 * * *', async ({ orgId }) => {
+      if (orgId === org.id) calls += 100;
+    });
+    const run = async (iso: string) => (await catchUpDailyJobs(new Date(iso))).flatMap((j) => j.results).filter((r) => r.orgId === org.id);
+
+    // 06:30 and 13:10 Athens (winter: UTC+2) — outside the window
+    expect(await catchUpDailyJobs(new Date('2027-01-15T04:30:00Z'))).toEqual([]);
+    expect(await catchUpDailyJobs(new Date('2027-01-15T11:10:00Z'))).toEqual([]);
+    expect(calls).toBe(0);
+
+    // 08:00 Athens: the 07:00 run never happened → it runs now, and fails
+    expect(await run('2027-01-15T06:00:00Z')).toMatchObject([{ status: 'failed' }]);
+    // 09:00: retried, succeeds
+    fail = false;
+    expect(await run('2027-01-15T07:00:00Z')).toMatchObject([{ status: 'ok', detail: { sent: 1 } }]);
+    // 10:00 and a restart at 10:05: nothing more to do
+    expect(await run('2027-01-15T08:00:00Z')).toMatchObject([{ status: 'skipped' }]);
+    expect(await run('2027-01-15T08:05:00Z')).toMatchObject([{ status: 'skipped' }]);
+    expect(calls).toBe(2);
+    expect(await dbFor(org).findOne('job_run', { job: 't-catch-up', run_date: '2027-01-15' })).toMatchObject({ status: 'ok', attempts: 2 });
+    // the next day is a new run
+    expect(await run('2027-01-16T06:00:00Z')).toMatchObject([{ status: 'ok' }]);
+    expect(calls).toBe(3);
   });
 });

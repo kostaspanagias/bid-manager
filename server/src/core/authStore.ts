@@ -22,6 +22,8 @@ export interface AuthUserRow {
   totp_last_step: number | null;
   failed_login_count: number;
   locked_until: Date | null;
+  totp_failed_count: number;
+  totp_locked_until: Date | null;
 }
 
 export interface SessionRow {
@@ -46,7 +48,7 @@ export interface InvitationRow {
 }
 
 const USER_COLUMNS = `u.id, u.org_id, u.email, u.name, u.org_role, u.active, u.password_hash, u.totp_secret,
-  u.totp_enabled_at, u.totp_last_step, u.failed_login_count, u.locked_until`;
+  u.totp_enabled_at, u.totp_last_step, u.failed_login_count, u.locked_until, u.totp_failed_count, u.totp_locked_until`;
 
 /** Login: users with this e-mail (normally 0 or 1; e-mail is unique per organization). */
 export async function findUsersByEmail(email: string): Promise<AuthUserRow[]> {
@@ -90,6 +92,8 @@ export async function findSessionWithUser(sessionId: string): Promise<{ session:
       totp_last_step: r.totp_last_step,
       failed_login_count: r.failed_login_count,
       locked_until: r.locked_until,
+      totp_failed_count: r.totp_failed_count,
+      totp_locked_until: r.totp_locked_until,
     },
   };
 }
