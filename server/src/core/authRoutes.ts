@@ -27,6 +27,10 @@ const acceptBody = tokenBody.extend({
   password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
 });
 
+const changePasswordBody = z
+  .object({ current_password: z.string().min(1).max(MAX_PASSWORD_LENGTH), new_password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH) })
+  .strict();
+
 const invalidCredentials = () => unauthorized('Invalid e-mail or password', 'invalid_credentials');
 const invalidCode = () => unauthorized('Invalid code', 'invalid_code');
 const invalidInvitation = () => notFound('Invitation is invalid or has expired', 'invitation_invalid');
@@ -88,6 +92,7 @@ export function authRouter(): Router {
   const loginLimiter = authLimiter(20);
   const totpLimiter = authLimiter(30);
   const inviteLimiter = authLimiter(30);
+  const passwordLimiter = authLimiter(10);
 
   router.post('/login', loginLimiter, async (req, res) => {
     const { email, password } = loginBody.parse(req.body);
@@ -170,6 +175,36 @@ export function authRouter(): Router {
     }
     await endSession(res, active);
     res.status(204).end();
+  });
+
+  // Change of the logged-in user's own password. Needs a full session + CSRF token (this router is mounted in
+  // front of requireAuth, so both are checked here). A wrong current password is a 422, not a 401: the session
+  // itself is fine. Every other session of the user ends; the audit entry carries no secrets.
+  router.post('/change-password', passwordLimiter, async (req, res) => {
+    const active = await requireSession(req);
+    if (!active.session.totp_verified) throw new HttpError(401, 'totp_required', 'Two-factor verification required');
+    assertCsrf(req, active);
+    const body = changePasswordBody.parse(req.body);
+    const { user } = active;
+    if (!(await verifyPassword(user.password_hash, body.current_password))) {
+      throw new HttpError(422, 'wrong_current_password', 'The current password is not correct');
+    }
+    if (body.new_password === body.current_password) {
+      throw new HttpError(422, 'password_unchanged', 'The new password must differ from the current one');
+    }
+    const passwordHash = await hashPassword(body.new_password);
+    await scopedDb(user.org_id, user.id).tx(async (db) => {
+      await db.sql('UPDATE "user" SET password_hash = :hash, failed_login_count = 0, locked_until = NULL WHERE org_id = :org_id AND id = :id', {
+        hash: passwordHash,
+        id: user.id,
+      });
+      const ended = await db.sql('DELETE FROM session WHERE org_id = :org_id AND user_id = :id AND id <> :current RETURNING id', {
+        id: user.id,
+        current: active.session.id,
+      });
+      await db.audit('user', user.id, 'password_changed', { after: { other_sessions_ended: ended.length } });
+    });
+    res.json({ ok: true });
   });
 
   router.get('/me', async (req, res) => {

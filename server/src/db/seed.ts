@@ -7,6 +7,9 @@ import { todayAthens } from '../domain/time.js';
 import { createOrganization, listOrganizations } from './admin.js';
 import { closePool } from './pool.js';
 import { scopedDb } from './scoped.js';
+import { seedTemplateL11 } from './seeds/templateL11.js';
+
+export { seedTemplateL11 };
 
 export interface SeedResult {
   orgId: string;
@@ -16,6 +19,8 @@ export interface SeedResult {
   /** Only set when the admin was created now with a generated password. */
   generatedPassword: string | null;
   holidaysAdded: number;
+  /** Template «L v1.1» (blueprint content) was created now. */
+  templateCreated: boolean;
 }
 
 export async function seed(env: NodeJS.ProcessEnv = process.env): Promise<SeedResult> {
@@ -42,7 +47,9 @@ export async function seed(env: NodeJS.ProcessEnv = process.env): Promise<SeedRe
   let holidaysAdded = 0;
   for (let y = year - 1; y <= year + 2; y++) holidaysAdded += (await seedHolidaysForYear(db, y)).length;
 
-  return { orgId: org.id, orgCreated: existing.length === 0, adminEmail, adminCreated, generatedPassword, holidaysAdded };
+  const template = await seedTemplateL11(db);
+
+  return { orgId: org.id, orgCreated: existing.length === 0, adminEmail, adminCreated, generatedPassword, holidaysAdded, templateCreated: template.created };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -57,6 +64,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.log(`Admin user ${r.adminEmail} already exists (password unchanged).`);
     }
     console.log(`Holidays added: ${r.holidaysAdded}.`);
+    console.log(`Template «L v1.1» ${r.templateCreated ? 'created' : 'already exists'}.`);
   } catch (err) {
     console.error((err as Error).message);
     process.exitCode = 1;

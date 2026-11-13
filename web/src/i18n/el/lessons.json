@@ -1,4 +1,48 @@
 {
   "title": "Lessons learned",
-  "subtitle": "Ευρήματα της ανασκόπησης μετά την κατάθεση· όσα αλλάζουν το template σημαδεύονται."
+  "subtitle": "Ευρήματα της ανασκόπησης μετά την κατάθεση· όσα αλλάζουν το template σημαδεύονται.",
+  "add": "Νέο lesson",
+  "addTitle": "Νέο lesson",
+  "editTitle": "Επεξεργασία lesson",
+  "text": "Τι μάθαμε",
+  "textHint": "Τι καθυστέρησε, τι κόντεψε να ξεφύγει, τι πήγε καλά.",
+  "category": "Κατηγορία",
+  "noCategory": "Χωρίς κατηγορία",
+  "changesTemplate": "Αλλάζει το template",
+  "changesTemplateHint": "Π.χ. νέα γραμμή checklist, διορθωμένο offset ή νέο στοιχείο watchlist. Ο διαχειριστής το περνά στην επόμενη έκδοση.",
+  "categories": {
+    "delay": "Καθυστέρηση",
+    "near_miss": "Κόντεψε να ξεφύγει",
+    "went_well": "Πήγε καλά",
+    "other": "Άλλο"
+  },
+  "badge": {
+    "pending": "Αλλάζει το template",
+    "applied": "Πέρασε στην v{{version}}"
+  },
+  "by": "{{name}} · {{date}}",
+  "usedTemplate": "Ο διαγωνισμός ακολούθησε το template {{version}}.",
+  "summary_one": "{{count}} lesson",
+  "summary_other": "{{count}} lessons",
+  "summaryPending": "{{count}} περιμένουν αλλαγή template",
+  "filterAll": "Όλα",
+  "filterTemplate": "Αλλάζουν το template",
+  "filterLabel": "Φίλτρο lessons",
+  "empty": "Δεν έχουν καταγραφεί lessons",
+  "emptyHint": "Μέσα σε 3 εργάσιμες από την κατάθεση γίνεται ανασκόπηση 30 λεπτών. Κάθε εύρημα γράφεται εδώ.",
+  "emptyFiltered": "Κανένα lesson δεν αλλάζει το template",
+  "added": "Το lesson καταγράφηκε",
+  "updated": "Το lesson ενημερώθηκε",
+  "deleted": "Το lesson διαγράφηκε",
+  "deleteTitle": "Διαγραφή lesson",
+  "deleteMessage": "Το lesson θα διαγραφεί οριστικά.",
+  "editAction": "Επεξεργασία lesson",
+  "deleteAction": "Διαγραφή lesson",
+  "appliedLocked": "Έχει ήδη περάσει σε έκδοση template, γι' αυτό η σημαία δεν αλλάζει.",
+  "errorCodes": {
+    "lesson_not_found": "Το lesson δεν βρέθηκε.",
+    "lesson_not_yours": "Μόνο όποιος το έγραψε, ο Bid manager ή ο Admin μπορεί να το αλλάξει.",
+    "lesson_already_applied": "Το lesson έχει ήδη περάσει σε έκδοση template.",
+    "lesson_not_flagged": "Το lesson δεν έχει τη σημαία «αλλάζει το template»."
+  }
 }

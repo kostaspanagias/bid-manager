@@ -440,3 +440,88 @@ describe('cookie flags in production', () => {
     }
   });
 });
+
+describe('change password (POST /api/auth/change-password)', () => {
+  const NEW_PASSWORD = 'a brand new passphrase';
+
+  it('changes the password, ends the other sessions, keeps this one, and audits without secrets', async () => {
+    const org = await createOrg();
+    const user = await createUser(org, 'member', { password: PASSWORD });
+    const here = await fullLogin(user);
+    const elsewhere = await fullLogin(user, 1);
+    expect((await elsewhere.agent.get('/api/auth/me')).status).toBe(200);
+
+    const res = await here.agent.post('/api/auth/change-password').set('X-CSRF-Token', here.csrf).send({ current_password: PASSWORD, new_password: NEW_PASSWORD });
+    expect([res.status, res.body]).toEqual([200, { ok: true }]);
+
+    expect((await here.agent.get('/api/auth/me')).status).toBe(200);
+    expect((await elsewhere.agent.get('/api/auth/me')).status).toBe(401);
+    expect(await dbFor(org).count('session', { user_id: user.id })).toBe(1);
+
+    // the old password is dead, the new one works
+    expect((await login(anon(), user)).status).toBe(401);
+    expect((await login(anon(), user, NEW_PASSWORD)).status).toBe(200);
+
+    const row = await dbFor(org).get('user', user.id);
+    expect(row!.password_hash).toMatch(/^\$argon2id\$/);
+    const entry = await dbFor(org).findOne('audit_log', { entity: 'user', entity_id: user.id, action: 'password_changed' });
+    expect(entry).toMatchObject({ user_id: user.id, after: { other_sessions_ended: 1 } });
+    const text = JSON.stringify(entry);
+    for (const secret of [PASSWORD, NEW_PASSWORD, row!.password_hash]) expect(text).not.toContain(secret);
+  });
+
+  it('rejects a wrong current password, a short or unchanged new one, and malformed input', async () => {
+    const org = await createOrg();
+    const user = await createUser(org, 'member', { password: PASSWORD });
+    const { agent, csrf } = await fullLogin(user);
+    const post = (body: Record<string, unknown>) => agent.post('/api/auth/change-password').set('X-CSRF-Token', csrf).send(body);
+
+    const wrong = await post({ current_password: 'not my password!!', new_password: NEW_PASSWORD });
+    expect([wrong.status, wrong.body.error.code]).toEqual([422, 'wrong_current_password']);
+    const same = await post({ current_password: PASSWORD, new_password: PASSWORD });
+    expect([same.status, same.body.error.code]).toEqual([422, 'password_unchanged']);
+    // same minimum length as accept-invite (12)
+    expect((await post({ current_password: PASSWORD, new_password: 'short-11-ch' })).status).toBe(400);
+    expect((await post({ current_password: PASSWORD, new_password: 'x'.repeat(201) })).status).toBe(400);
+    expect((await post({ new_password: NEW_PASSWORD })).status).toBe(400);
+    expect((await post({ current_password: PASSWORD, new_password: NEW_PASSWORD, user_id: 'someone-else' })).status).toBe(400);
+
+    // nothing changed: still logged in, old password still valid, nothing audited
+    expect((await agent.get('/api/auth/me')).status).toBe(200);
+    expect((await login(anon(), user)).status).toBe(200);
+    expect(await dbFor(org).count('audit_log', { entity: 'user', action: 'password_changed' })).toBe(0);
+  });
+
+  it('needs a full session and the CSRF token', async () => {
+    const org = await createOrg();
+    const user = await createUser(org, 'member', { password: PASSWORD });
+    const body = { current_password: PASSWORD, new_password: NEW_PASSWORD };
+
+    expect((await anon().post('/api/auth/change-password').send(body)).status).toBe(401);
+
+    const partial = anon();
+    const step1 = await login(partial, user);
+    const half = await partial.post('/api/auth/change-password').set('X-CSRF-Token', step1.body.csrfToken).send(body);
+    expect([half.status, half.body.error.code]).toEqual([401, 'totp_required']);
+
+    const { agent } = await fullLogin(user);
+    const noCsrf = await agent.post('/api/auth/change-password').send(body);
+    expect([noCsrf.status, noCsrf.body.error.code]).toEqual([403, 'csrf_invalid']);
+    expect((await login(anon(), user)).status).toBe(200);
+  });
+
+  it('only ever touches the caller: same e-mail in another organization keeps its password and sessions', async () => {
+    const email = `shared-${Date.now()}@example.com`;
+    const [orgA, orgB] = [await createOrg(), await createOrg()];
+    const a = await createUser(orgA, 'member', { email, password: PASSWORD });
+    const b = await createUser(orgB, 'member', { email, password: 'the other org passphrase' });
+    await as(b);
+    const { agent, csrf } = await fullLogin(a);
+    const res = await agent.post('/api/auth/change-password').set('X-CSRF-Token', csrf).send({ current_password: PASSWORD, new_password: NEW_PASSWORD });
+    expect(res.status).toBe(200);
+    expect(await dbFor(orgB).count('session', { user_id: b.id })).toBe(1);
+    expect(await dbFor(orgB).count('audit_log', { action: 'password_changed' })).toBe(0);
+    const after = anon();
+    expect((await after.post('/api/auth/login').send({ email, password: 'the other org passphrase' })).status).toBe(200);
+  });
+});
