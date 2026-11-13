@@ -55,7 +55,7 @@ export async function startStack({ build = false } = {}) {
     SEED_ADMIN_PASSWORD: ADMIN.password,
     SEED_ORG_NAME: 'Active Computer Systems (e2e)',
     SMTP_HOST: '',
-    FILE_ENCRYPTION_KEY: randomBytes(32).toString('hex'),
+    FILE_ENCRYPTION_KEY: process.env.E2E_FILE_ENCRYPTION_KEY ?? randomBytes(32).toString('hex'),
     BM_NO_DOTENV: '1',
     LOG_LEVEL: 'info',
   };
